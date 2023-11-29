@@ -1,0 +1,14 @@
+name        = "Devnull - Fair Start"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[This mod is designed to give both teams same information about the other teams start location.
+
+It will do this in two ways:
+- Changed team message that will be displayed during countdown and at start of round.
+- Perform a map ping for the team with other teams start location.
+
+Mod ID: 9928e9e9]=]
+image       = "preview.jpg"
+tag_modtype = "Map"
+tag_support = "Must be run on Server"
+publish_id = 2569595369

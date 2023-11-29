@@ -1,0 +1,17 @@
+name        = "Devnull - Quality Of NS2 Life"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[This mod adds some quality of life changes.
+
+Change list:
+- When as marine you pickup or switch to empty weapon a reload will be tried.
+- As onos, if boneshield is broken it will keep displaying until it's not broken. :-)
+- Gorge babblers will now detach around the gorge instead of everyone at same location above the gorge.
+- Babblers will stay out for at least the duration of the babbler ball.
+
+
+Publish ID = 2722910336]=]
+image       = "preview.jpg"
+tag_modtype = "Look and Feel"
+tag_support = "Must be run on Server"
+publish_id = 2722910336

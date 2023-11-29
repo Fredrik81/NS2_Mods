@@ -1,0 +1,4 @@
+modEntry = {
+	FileHooks = "lua/Devnull_FS/Filehooks.lua",
+	Priority = 205
+}

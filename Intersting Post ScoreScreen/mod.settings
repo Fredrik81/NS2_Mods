@@ -1,0 +1,16 @@
+name        = "Devnull - Interesting Score Screen"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[Adding Top Players to score screen based on:
+- Score
+- Player Damage
+- Structure Damage
+- Build Time
+
+Also showing steam Avatar for top players making it a bit more personal and highlighting those that have performed well.
+
+Publish ID = 2606061626]=]
+image       = "preview.jpg"
+tag_modtype = "Look and Feel"
+tag_support = "Must be run on Server"
+publish_id = 2606061626

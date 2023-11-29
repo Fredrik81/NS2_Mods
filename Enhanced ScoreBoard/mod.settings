@@ -1,0 +1,15 @@
+name        = "Devnull - Enhanced ScoreBoard"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[This mod will change various parts of the ScoreBoard:
+- Steam Icon location fix.
+- Commander tag will stay when jumping out temporary
+- New team topbar showing current lifeforms and equipment
+- Some general tweaks and performance fixes
+more to come...
+
+Publish ID: 2597529958]=]
+image       = "preview.jpg"
+tag_modtype = "Look and Feel"
+tag_support = "Must be run on Server"
+publish_id = 2597529958

@@ -1,0 +1,13 @@
+
+
+
+local Build = Shared.GetBuildNumber()
+if Build >= 340 then
+    modEntry = {
+        ModName = "Devnull - Enhanced ScoreBoard",
+        FileHooks = "lua/Devnull_ESB/Filehooks.lua",
+        Priority = 99
+    }
+else
+    modEntry = {} --avoid console error
+end

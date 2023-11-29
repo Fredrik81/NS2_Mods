@@ -1,0 +1,8 @@
+name        = "Devnull Crosshair"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[Colorized cross and circle crosshair.]=]
+image       = "preview.jpg"
+tag_modtype = "Crosshairs"
+tag_support = "Passes Default Consistency"
+publish_id = "91ce1fbf"

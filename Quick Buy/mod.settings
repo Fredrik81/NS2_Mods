@@ -1,0 +1,18 @@
+name        = "Devnull - Quick Buy"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[This mod allows players to set hotkey's for marine buy/alien evolve menus.
+
+The code for this comes from this mod and all credit should go to the person behind the orgiginal mod:
+https://steamcommunity.com/sharedfiles/filedetails/?id=1951316468&searchtext=quick+buy
+
+Will automatically disable in custom game types (Combat etc.)
+
+Tested with NS2 build 338
+
+Mod ID: 9e704b45
+Publish ID: 2658159429]=]
+image       = "preview.jpg"
+tag_modtype = "Gameplay Tweak"
+tag_support = "Must be run on Server"
+publish_id = 2658159429
