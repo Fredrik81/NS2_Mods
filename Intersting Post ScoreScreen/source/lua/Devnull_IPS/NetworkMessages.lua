@@ -16,6 +16,7 @@ local kPlayerStatsMessage = {
     score = string.format("integer (0 to %d)", kMaxScore),
     accuracy = "float (0 to 100 by 0.01)",
     accuracyOnos = "float (-1 to 100 by 0.01)",
+    accuracyFiltered = "string (30)",
     pdmg = "float (0 to 524287 by 0.01)",
     sdmg = "float (0 to 524287 by 0.01)",
     minutesBuilding = "float (0 to 1023 by 0.01)",

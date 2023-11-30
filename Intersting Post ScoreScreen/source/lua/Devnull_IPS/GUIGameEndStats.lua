@@ -195,8 +195,8 @@ local kAvatarFrameTexture = PrecacheAsset("ui/thunderdome/roledisplay_avatar_fra
 local kEalAlienTexture = PrecacheAsset("ui/Devnull_IPS/Alien.dds")
 local kEalMarineArmoryTexture = PrecacheAsset("ui/Devnull_IPS/Marine.dds")
 local kIpsBackgroundGeneric = PrecacheAsset("ui/Devnull_IPS/bg_generic.dds")
-local kIpsBackgroundAliens = PrecacheAsset("ui/Devnull_IPS/bg_alien_" .. tostring(math.random(1 ,2)) .. ".dds")
-local kIpsBackgroundMarines = PrecacheAsset("ui/Devnull_IPS/bg_marines_" .. tostring(math.random(1 ,2)) .. ".dds")
+local kIpsBackgroundAliens = PrecacheAsset("ui/Devnull_IPS/bg_alien_" .. tostring(math.random(1, 2)) .. ".dds")
+local kIpsBackgroundMarines = PrecacheAsset("ui/Devnull_IPS/bg_marines_" .. tostring(math.random(1, 2)) .. ".dds")
 -- local kSmurfAvatarTexture = PrecacheAsset("ui/smurf_avatar.dds")
 local kCommBadgeTexture = PrecacheAsset("ui/badges/commander_20.dds")
 local kCommSkillIconTexture = PrecacheAsset("ui/Devnull_IPS/ComSkillBadges.dds")
@@ -2528,7 +2528,7 @@ function GUIGameEndStats:RepositionStats()
     self.yourStatsTextShadow:SetIsVisible(#self.statsCards > 0)
 
     if self.topPlayersTextShadow:GetIsVisible() then
-        yPos = yPos +  GUILinearScale(146 + 162)
+        yPos = yPos + GUILinearScale(146 + 162)
     end
 
     if self.team1UI.background:GetIsVisible() then
@@ -3972,7 +3972,12 @@ function GUIGameEndStats:ProcessStats()
             message.isRookie,
             message.hiveSkill
         )
-        table.insert(self.toolTipCards, playerScoreboardRow.skillIcon)
+        table.insert(self.toolTipCards, playerScoreboardRow.skillIcon) --mee
+        if message["accuracyFiltered"] and message["accuracyFiltered"] ~= "NaN" then
+            playerScoreboardRow.acc.tooltip = message["accuracyFiltered"]
+            table.insert(self.toolTipCards, playerScoreboardRow.acc)
+        end
+
         table.insert(teamObj.playerRows, playerScoreboardRow)
         -- Store some of the original info so we can sort afterwards
         teamObj.playerRows[#teamObj.playerRows].originalOrder = playerCount

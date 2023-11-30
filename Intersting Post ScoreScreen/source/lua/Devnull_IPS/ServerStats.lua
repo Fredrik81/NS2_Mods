@@ -807,6 +807,19 @@ function StatsUI_FormatRoundStats()
 				local statEntry = {}
 
 				local accuracy, accuracyOnos = CHUDGetAccuracy(entry.hits, entry.misses, entry.onosHits)
+				local accFiltered = "NaN"
+				if teamNumber == 1 then
+					for wTechName, wStats in pairs(stats["weapons"]) do
+						if kTechId[wTechName] == kTechId.Rifle then
+							local accuracy, accuracyOnos = CHUDGetAccuracy(wStats.hits, wStats.misses, wStats.onosHits)
+							accFiltered = wTechName .. ": " .. round(accuracy, 0) .. "%"
+							if accuracyOnos > 0 and accuracy ~= accuracyOnos then
+								accFiltered = accFiltered .. " (" .. round(accuracyOnos, 0) .. "%)"
+							end
+						end
+					end
+				end
+
 				--print("Stats dump: " .. dump(stats))
 				statEntry.isMarine = teamNumber == 1
 				statEntry.playerName = stats.playerName
@@ -816,6 +829,7 @@ function StatsUI_FormatRoundStats()
 				statEntry.commanderSkill = stats.commanderSkill or 0
 				statEntry.commanderSkillMarine = stats.commanderSkillMarine or 0
 				statEntry.commanderSkillAlien = stats.commanderSkillAlien or 0
+				statEntry.accuracyFiltered = accFiltered
 				statEntry.kills = entry.kills
 				statEntry.killstreak = entry.killstreak
 				statEntry.assists = entry.assists
@@ -830,7 +844,6 @@ function StatsUI_FormatRoundStats()
 				statEntry.minutesComm = entry.commanderTime / 60
 				statEntry.isRookie = entry.isRookie
 				statEntry.steamId = steamId
-
 				if teamNumber == 1 then
 					table.insert(finalStats[1], statEntry)
 				else
