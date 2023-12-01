@@ -715,6 +715,10 @@ function StatsUI_ResetStats()
 	STATS_ExportResearch = {}
 	STATS_ExportBuilding = {}
 
+	STATS_PresGraphAliens = {}
+	STATS_PresGraphMarines = {}
+
+
 	-- Do this so we can spawn items without a commander with cheats on
 	StatsUI_SetMarineCommmaderSteamID(0)
 	StatsUI_ResetCommStats(StatsUI_GetMarineCommmaderSteamID())
@@ -1071,6 +1075,15 @@ function StatsUI_SendTeamStats()
 		buildMsg.lost = entry.lost
 		Server.SendNetworkMessage("BuildingSummary", buildMsg, true)
 	end
+
+	for _, entry in ipairs(STATS_PresGraphMarines) do
+		Server.SendNetworkMessage("PresGraphStatsMarines", entry, true)
+	end
+
+	for _, entry in ipairs(STATS_PresGraphAliens) do
+		Server.SendNetworkMessage("PresGraphStatsAliens", entry, true)
+	end
+
 end
 
 local function GetServerMods()
@@ -1377,4 +1390,32 @@ function StatsUI_RegisterTSS(TechName, msg)
 	--print("- SteamID      : " .. msg.steamId)
 	--print("- Value        : " .. tostring(msg.Value))
 	--print("- Current value: " .. tostring(STATS_TeamSpecificStats[TechName][msg.steamId]))
+end
+
+
+
+local STATS_PresGraph = {}
+function STATSUI_PresGraphAliens(presUnused, presEquipped, rtAmount, playerCount)
+	table.insert(
+		STATS_PresGraphAliens,
+		{
+			presUnused = presUnused,
+			rtAmount = rtAmount,
+			presEquipped = presEquipped,
+			gameMinute = GetGameTime(true), 
+			playerCount = playerCount, -- doesnt count the commander
+		}
+	)
+end
+function STATSUI_PresGraphMarines(presUnused, presEquipped, rtAmount, playerCount)
+	table.insert(
+		STATS_PresGraphMarines,
+		{
+			presUnused = presUnused,
+			rtAmount = rtAmount,
+			presEquipped = presEquipped,
+			gameMinute = GetGameTime(true), 
+			playerCount = playerCount, -- doesnt count the commander
+		}
+	)
 end

@@ -56,3 +56,30 @@ local kDeathStatsMessage = {
     aliveFor = "float (0 to 524287 by 0.01)"
 }
 Shared.RegisterNetworkMessage("DeathStats", kDeathStatsMessage)
+
+
+
+
+
+local kPresGraphStatsMarines = {
+    presUnused = "float (0 to 3200 by 0.1)",
+    rtAmount = "integer (0 to 32)",
+    presEquipped = "float (0 to 3200 by 0.1)",
+    gameMinute = "float (0 to 524287 by 0.01)",
+    playerCount = "integer (0 to 32)"
+}
+Shared.RegisterNetworkMessage("PresGraphStatsMarines", kPresGraphStatsMarines)
+
+local kPresGraphStatsAliens = {
+    presUnused = "float (0 to 3200 by 0.1)",
+    rtAmount = "integer (0 to 32)",
+    presEquipped = "float (0 to 3200 by 0.1)",
+    gameMinute = "float (0 to 524287 by 0.01)",
+    playerCount = "integer (0 to 32)"
+}
+Shared.RegisterNetworkMessage("PresGraphStatsAliens", kPresGraphStatsAliens)
+
+
+
+
+

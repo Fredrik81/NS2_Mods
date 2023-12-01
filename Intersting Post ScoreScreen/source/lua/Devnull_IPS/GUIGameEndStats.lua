@@ -265,6 +265,9 @@ local TopPDmgPlayer = {}
 local TopSDmgPlayer = {}
 local TopBuildTimePlayer = {}
 
+local presGraphTableMarines = {} 
+local presGraphTableAliens = {} 
+
 local function estimateHiveSkillGraph()
     if #hiveSkillGraphTable ~= 0 or #finalStatsTable == 0 then
         return
@@ -1892,6 +1895,10 @@ function GUIGameEndStats:LoadLastRoundStats()
                 buildingSummaryTable = parsedFile.buildingSummaryTable or {}
                 statusSummaryTable = parsedFile.statusSummaryTable or {}
 
+				presGraphTableMarines = parsedFile.presGraphTableMarines or {}
+				presGraphTableAliens = parsedFile.presGraphTableAliens or {}
+
+
                 if #hiveSkillGraphTable == 0 then
                     estimateHiveSkillGraph()
                 end
@@ -1919,6 +1926,11 @@ function GUIGameEndStats:SaveLastRoundStats()
         savedStats.buildingSummaryTable = buildingSummaryTable
         savedStats.statusSummaryTable = statusSummaryTable
         savedStats.techLogTable = techLogTable
+
+        -- presGraph Mod
+		savedStats.presGraphTableMarines = presGraphTableMarines
+		savedStats.presGraphTableAliens = presGraphTableAliens
+
 
         local savedFile = io.open(lastRoundFile, "w+")
         if savedFile then
@@ -2248,6 +2260,33 @@ function GUIGameEndStats:Initialize()
     self.rtGraphTextShadow:SetLayer(kGUILayerMainMenu)
     self.background:AddChild(self.rtGraphTextShadow)
 
+	self.presGraphTextShadow = GUIManager:CreateTextItem()
+    self.presGraphTextShadow:SetStencilFunc(GUIItem.NotEqual)
+    self.presGraphTextShadow:SetFontName(kTitleFontName)
+    self.presGraphTextShadow:SetColor(Color(0, 0, 0, 1))
+    self.presGraphTextShadow:SetScale(scaledVector)
+    GUIMakeFontScale(self.presGraphTextShadow)
+    self.presGraphTextShadow:SetIsVisible(false)
+    self.presGraphTextShadow:SetText("PRES GRAPH (Used Pres, Used+Unused Pres) (BETA) ")
+    self.presGraphTextShadow:SetAnchor(GUIItem.Left, GUIItem.Top)
+    self.presGraphTextShadow:SetTextAlignmentX(GUIItem.Align_Center)
+    self.presGraphTextShadow:SetLayer(kGUILayerMainMenu)
+    self.background:AddChild(self.presGraphTextShadow)
+
+    self.presGraphText = GUIManager:CreateTextItem()
+    self.presGraphText:SetStencilFunc(GUIItem.NotEqual)
+    self.presGraphText:SetFontName(kTitleFontName)
+    self.presGraphText:SetColor(Color(1, 1, 1, 1))
+    self.presGraphText:SetScale(scaledVector)
+    GUIMakeFontScale(self.presGraphText)
+    self.presGraphText:SetText("PRES GRAPH (Used Pres, Used+Unused Pres) (BETA)")
+    self.presGraphText:SetAnchor(GUIItem.Left, GUIItem.Top)
+    self.presGraphText:SetTextAlignmentX(GUIItem.Align_Center)
+    self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
+    self.presGraphText:SetLayer(kGUILayerMainMenu)
+    self.presGraphTextShadow:AddChild(self.presGraphText)
+
+
     self.rtGraphText = GUIManager:CreateTextItem()
     self.rtGraphText:SetStencilFunc(GUIItem.NotEqual)
     self.rtGraphText:SetFontName(kTitleFontName)
@@ -2357,6 +2396,27 @@ function GUIGameEndStats:Initialize()
 
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
+
+	self.presGraph= {} 
+	self.presGraph = LineGraph()
+    self.presGraph:Initialize()
+    self.presGraph:SetAnchor(GUIItem.Middle, GUIItem.Top)
+    self.presGraph:SetSize(rtGraphSize)
+    self.presGraph:SetYGridSpacing(1)
+    self.presGraph:SetIsVisible(false)
+    self.presGraph:SetXAxisIsTime(true)
+    self.presGraph:ExtendXAxisToBounds(true)
+    self.presGraph:GiveParent(self.background)
+    self.presGraph:SetStencilFunc(GUIItem.NotEqual)
+
+    self.presGraph:StartLine(1, kBlueColor)
+    self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
+    self.presGraph:StartLine(3, kRedColor)
+    self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
+    -- kBlueColor = Color(0, 0.6117, 1, 1)
+    -- kRedColor = Color(1, 0.4941, 0, 1)
+
+
 
     self.builtRTsComp = ComparisonBarGraph()
     self.builtRTsComp:Initialize()
@@ -2614,6 +2674,18 @@ function GUIGameEndStats:RepositionStats()
         self.hiveSkillGraph:SetPosition(Vector((kTitleSize.x - rtGraphSize.x) / 2, yPos, 0))
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
+
+	local showpresGraph = #self.presGraphs > 0
+    self.presGraphTextShadow:SetIsVisible(showpresGraph)
+    self.presGraph:SetIsVisible(showpresGraph)
+    if showpresGraph then
+        self.presGraphTextShadow:SetPosition(Vector((kTitleSize.x - GUILinearScale(32)) / 2, yPos, 0))
+        yPos = yPos + GUILinearScale(32)
+
+        self.presGraph:SetPosition(Vector((kTitleSize.x - rtGraphSize.x) / 2, yPos, 0))
+        yPos = yPos + rtGraphSize.y + GUILinearScale(72)
+    end
+
 
     self.contentSize = math.max(self.contentSize, yPos)
 end
@@ -4538,6 +4610,90 @@ function GUIGameEndStats:ProcessStats()
 		end
 	end
 	]]
+
+
+	local function getPresGraphPoints(teamNumber, presTable, graphCeiling, equippedGraph, totalGraph)
+
+		table.sort(presTable, function(a, b)
+			return a.gameMinute < b.gameMinute
+		end)
+
+		local presUnused
+        local presEquipped
+		local resGain -- pres gained between 2 table entries
+		local nextGameSecond
+		local rtAmount
+
+		for i = 1, #presTable  do
+			local entry = presTable[i]
+			local gameSecond = entry.gameMinute * 60
+			
+			-- skip first point since table entries start at 0 seconds
+			if i ~= 1 then 
+                table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
+                table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused + resGain, 0)) -- uses resgain of previous loop
+			end
+
+			presEquipped = entry.presEquipped
+			presUnused = entry.presUnused
+			graphCeiling = math.max(graphCeiling, presEquipped + presUnused) 
+
+
+			table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
+			table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused, 0))
+
+
+			if presTable[i+1] == nil then 
+				nextGameSecond = miscDataTable.gameLengthMinutes * 60
+			else
+				nextGameSecond = presTable[i+1].gameMinute * 60
+			end
+			local timeBetweenPoints = nextGameSecond - gameSecond
+			resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
+	
+		end
+
+		-- last points
+		table.insert(equippedGraph, Vector(nextGameSecond, presEquipped, 0))
+		table.insert(totalGraph, Vector(nextGameSecond, presEquipped + presUnused + resGain, 0))
+
+		return graphCeiling
+	end
+
+	-- presGraph Mod
+    self.presGraphs = {}
+	if #presGraphTableMarines > 0 and #presGraphTableAliens > 0 then 
+
+		self.presGraphs[1] = {} -- Marine equipped pres
+		self.presGraphs[2] = {} -- Marine equipped + saved pres
+		self.presGraphs[3] = {} -- Alien evolved pres
+		self.presGraphs[4] = {} -- Alien evolved + saved pres
+		local graphCeiling = 0
+
+		graphCeiling = getPresGraphPoints(1, presGraphTableMarines, graphCeiling, self.presGraphs[1], self.presGraphs[2])
+		graphCeiling = getPresGraphPoints(2, presGraphTableAliens, graphCeiling, self.presGraphs[3], self.presGraphs[4])
+
+		self.presGraph:SetPoints(1, self.presGraphs[1])
+		self.presGraph:SetPoints(2, self.presGraphs[2])
+		self.presGraph:SetPoints(3, self.presGraphs[3])
+		self.presGraph:SetPoints(4, self.presGraphs[4])
+
+		local maxYBounds = math.ceil( graphCeiling / 50 ) * 50 + 100
+		self.presGraph:SetYBounds(0, maxYBounds, true)
+
+		local gameLength = miscDataTable.gameLengthMinutes * 60
+		local xSpacing = GetXSpacing(gameLength)
+		self.presGraph:SetXBounds(0, gameLength)
+		self.presGraph:SetXGridSpacing(xSpacing)
+
+		local yGridSpacing = graphCeiling <= 200 and 25 or graphCeiling <= 400 and 50 or graphCeiling <= 800 and 100 or Round(maxYBounds / 8, -2)
+		self.presGraph:SetYGridSpacing(yGridSpacing) 
+    end
+
+
+
+
+
     self:RepositionStats()
 
     pcall(self.SaveLastRoundStats, self)
@@ -4561,6 +4717,9 @@ function GUIGameEndStats:ProcessStats()
     DIPS_AlienCommID = nil
     DIPS_MarineCommID = nil
     DIPS_EnahncedStats = false
+
+	presGraphTableAliens = {}
+	presGraphTableMarines = {}
 end
 
 function GUIGameEndStats:Update()
@@ -5185,3 +5344,22 @@ Client.HookNetworkMessage("TechLog", CHUDSetTechLog)
 Client.HookNetworkMessage("BuildingSummary", CHUDSetBuildingSummary)
 Client.HookNetworkMessage("EquipmentAndLifeforms", CHUDEquipmentAndLifeformsLog)
 Client.HookNetworkMessage("TeamSpecificStats", CHUDTeamSpecificStatsLog)
+
+local function CHUDPresGraphAliens(message)
+    if message and message.gameMinute then
+        table.insert(presGraphTableAliens, message) 
+    end
+    lastStatsMsg = Shared.GetTime()
+end
+Client.HookNetworkMessage("PresGraphStatsAliens", CHUDPresGraphAliens)
+
+
+-- presGraph Mod
+local function CHUDPresGraphMarines(message)
+    if message and message.gameMinute then
+        table.insert(presGraphTableMarines, message)
+    end
+    lastStatsMsg = Shared.GetTime()
+end
+Client.HookNetworkMessage("PresGraphStatsMarines", CHUDPresGraphMarines)
+
