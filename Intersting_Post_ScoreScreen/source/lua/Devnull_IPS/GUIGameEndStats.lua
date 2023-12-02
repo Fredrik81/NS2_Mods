@@ -2417,7 +2417,7 @@ function GUIGameEndStats:Initialize()
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
 
-    self.presGraphText.tooltip = "Lower Lines: Personal Resources spend in weapons/lifeforms etc\nHigher Lines: Personal Resources spend and unspend"
+    self.presGraphText.tooltip = "Lower Lines: Personal Resources invested in weapons/lifeforms etc\nHigher Lines: Personal Resources invested and unspend"
     table.insert(self.toolTipCards, self.presGraphText)
 
 
