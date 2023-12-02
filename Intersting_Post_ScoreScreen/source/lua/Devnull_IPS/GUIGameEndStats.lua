@@ -1895,8 +1895,8 @@ function GUIGameEndStats:LoadLastRoundStats()
                 buildingSummaryTable = parsedFile.buildingSummaryTable or {}
                 statusSummaryTable = parsedFile.statusSummaryTable or {}
 
-				presGraphTableMarines = parsedFile.presGraphTableMarines or {}
-				presGraphTableAliens = parsedFile.presGraphTableAliens or {}
+		presGraphTableMarines = parsedFile.presGraphTableMarines or {}
+		presGraphTableAliens = parsedFile.presGraphTableAliens or {}
 
 
                 if #hiveSkillGraphTable == 0 then
@@ -1927,9 +1927,8 @@ function GUIGameEndStats:SaveLastRoundStats()
         savedStats.statusSummaryTable = statusSummaryTable
         savedStats.techLogTable = techLogTable
 
-        -- presGraph Mod
-		savedStats.presGraphTableMarines = presGraphTableMarines
-		savedStats.presGraphTableAliens = presGraphTableAliens
+	savedStats.presGraphTableMarines = presGraphTableMarines
+	savedStats.presGraphTableAliens = presGraphTableAliens
 
 
         local savedFile = io.open(lastRoundFile, "w+")
@@ -2260,7 +2259,7 @@ function GUIGameEndStats:Initialize()
     self.rtGraphTextShadow:SetLayer(kGUILayerMainMenu)
     self.background:AddChild(self.rtGraphTextShadow)
 
-	self.presGraphTextShadow = GUIManager:CreateTextItem()
+    self.presGraphTextShadow = GUIManager:CreateTextItem()
     self.presGraphTextShadow:SetStencilFunc(GUIItem.NotEqual)
     self.presGraphTextShadow:SetFontName(kTitleFontName)
     self.presGraphTextShadow:SetColor(Color(0, 0, 0, 1))
@@ -2397,8 +2396,8 @@ function GUIGameEndStats:Initialize()
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
 
-	self.presGraph= {} 
-	self.presGraph = LineGraph()
+    self.presGraph= {} 
+    self.presGraph = LineGraph()
     self.presGraph:Initialize()
     self.presGraph:SetAnchor(GUIItem.Middle, GUIItem.Top)
     self.presGraph:SetSize(rtGraphSize)
@@ -4718,8 +4717,8 @@ function GUIGameEndStats:ProcessStats()
     DIPS_MarineCommID = nil
     DIPS_EnahncedStats = false
 
-	presGraphTableAliens = {}
-	presGraphTableMarines = {}
+    presGraphTableAliens = {}
+    presGraphTableMarines = {}
 end
 
 function GUIGameEndStats:Update()
