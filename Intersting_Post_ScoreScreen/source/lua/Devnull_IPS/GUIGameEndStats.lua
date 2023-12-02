@@ -2266,7 +2266,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphTextShadow:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphTextShadow)
     self.presGraphTextShadow:SetIsVisible(false)
-    self.presGraphTextShadow:SetText("PRES GRAPH (Used Pres, Used+Unused Pres) (BETA) ")
+    self.presGraphTextShadow:SetText("PRES GRAPH (BETA)")
     self.presGraphTextShadow:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphTextShadow:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphTextShadow:SetLayer(kGUILayerMainMenu)
@@ -2278,12 +2278,14 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetColor(Color(1, 1, 1, 1))
     self.presGraphText:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphText)
-    self.presGraphText:SetText("PRES GRAPH (Used Pres, Used+Unused Pres) (BETA)")
+    self.presGraphText:SetText("PRES GRAPH (BETA)")
     self.presGraphText:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphText:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
     self.presGraphText:SetLayer(kGUILayerMainMenu)
     self.presGraphTextShadow:AddChild(self.presGraphText)
+
+  
 
 
     self.rtGraphText = GUIManager:CreateTextItem()
@@ -2415,6 +2417,8 @@ function GUIGameEndStats:Initialize()
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
 
+    self.presGraphText.tooltip = "Lower Lines: Personal Resources spend in weapons/lifeforms etc\nHigher Lines: Personal Resources spend and unspend"
+    table.insert(self.toolTipCards, self.presGraphText)
 
 
     self.builtRTsComp = ComparisonBarGraph()
