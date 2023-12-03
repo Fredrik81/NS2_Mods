@@ -2266,7 +2266,8 @@ function GUIGameEndStats:Initialize()
     self.presGraphTextShadow:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphTextShadow)
     self.presGraphTextShadow:SetIsVisible(false)
-    self.presGraphTextShadow:SetText("PRES GRAPH (BETA)")
+    self.presGraphTextShadow:SetText("PRES GRAPH (invested PRes with and without unused PRes) (BETA)")
+
     self.presGraphTextShadow:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphTextShadow:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphTextShadow:SetLayer(kGUILayerMainMenu)
@@ -2278,7 +2279,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetColor(Color(1, 1, 1, 1))
     self.presGraphText:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphText)
-    self.presGraphText:SetText("PRES GRAPH (BETA)")
+    self.presGraphText:SetText("PRES GRAPH (invested PRes with and without unused PRes) (BETA)")
     self.presGraphText:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphText:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
@@ -2417,10 +2418,11 @@ function GUIGameEndStats:Initialize()
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
 
-    self.presGraphText.tooltip = "Lower Lines: Personal Resources invested in weapons/lifeforms etc\nHigher Lines: Personal Resources invested and unspend"
+    self.presGraphText.tooltip = "Higher lines: also includes unused pres\nLower lines: current invested pres of both teams"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
+
 
 
 
