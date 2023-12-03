@@ -2399,7 +2399,7 @@ function GUIGameEndStats:Initialize()
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
 
-    self.presGraph= {} 
+    self.presGraph = {} 
     self.presGraph = LineGraph()
     self.presGraph:Initialize()
     self.presGraph:SetAnchor(GUIItem.Middle, GUIItem.Top)
@@ -2420,6 +2420,8 @@ function GUIGameEndStats:Initialize()
 
     self.presGraphText.tooltip = "Lower lines: current invested pres of both teams\nHigher lines: includes unused pres"
     table.insert(self.toolTipCards, self.presGraphText)
+    table.insert(self.toolTipCards, self.presGraph.graphBackground)
+
 
 
 
