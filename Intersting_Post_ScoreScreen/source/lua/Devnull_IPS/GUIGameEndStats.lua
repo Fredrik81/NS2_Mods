@@ -2419,6 +2419,7 @@ function GUIGameEndStats:Initialize()
     -- kRedColor = Color(1, 0.4941, 0, 1)
 
     self.presGraphText.tooltip = "Lower lines: current invested pres of both teams\nHigher lines: includes unused pres"
+    self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
 
