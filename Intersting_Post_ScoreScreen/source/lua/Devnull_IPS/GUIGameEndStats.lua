@@ -2423,7 +2423,6 @@ function GUIGameEndStats:Initialize()
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
 
 
-
     self.builtRTsComp = ComparisonBarGraph()
     self.builtRTsComp:Initialize()
     self.builtRTsComp:SetAnchor(GUIItem.Middle, GUIItem.Top)
