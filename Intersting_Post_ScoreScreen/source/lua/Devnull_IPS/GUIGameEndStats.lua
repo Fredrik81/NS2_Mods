@@ -2398,7 +2398,7 @@ function GUIGameEndStats:Initialize()
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
 
-    self.presGraph= {} 
+    self.presGraph = {} 
     self.presGraph = LineGraph()
     self.presGraph:Initialize()
     self.presGraph:SetAnchor(GUIItem.Middle, GUIItem.Top)
@@ -2418,7 +2418,10 @@ function GUIGameEndStats:Initialize()
     -- kRedColor = Color(1, 0.4941, 0, 1)
 
     self.presGraphText.tooltip = "Lower Lines: Personal Resources invested in weapons/lifeforms etc\nHigher Lines: Personal Resources invested and unspend"
+    self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
+    table.insert(self.toolTipCards, self.presGraph.graphBackground)
+
 
 
     self.builtRTsComp = ComparisonBarGraph()
