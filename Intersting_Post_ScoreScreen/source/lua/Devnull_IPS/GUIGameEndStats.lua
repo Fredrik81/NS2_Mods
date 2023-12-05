@@ -4626,60 +4626,55 @@ function GUIGameEndStats:ProcessStats()
 			return a.gameMinute < b.gameMinute
 		end)
 
-		local presUnused
-        local presEquipped
-		local resGain -- pres gained between 2 table entries
 		local nextGameSecond
-		local rtAmount
-
         local gameLength = miscDataTable.gameLengthMinutes
-        local graphSkipFrequency = math.ceil(gameLength / 30) -- counts up for every started 30 min interval. 
-        local resGainSum = 0 -- Sum of pres gain of rts until next drawed point. 
-        local skipCounter = 0
 
+        -- counts up for every started 20 min interval. This limites the lines used in the graph to 1600 lines
+        local graphSkipFrequency = math.ceil(gameLength / 20)
+        
+        -- used to draw the projected point with the resgain
+        local projectedPoint = {}
 
 		for i = 1, #presTable  do
 			local entry = presTable[i]
 			local gameSecond = entry.gameMinute * 60
+
+            graphCeiling = math.max(graphCeiling, entry.presEquipped + entry.presUnused) 
 			
-            -- skip every second point at 30-60min rounds, 2 out of 3 points at 60-90min rounds and so on. 
-            skipCounter = skipCounter + 1
-            if skipCounter % graphSkipFrequency == 0 then 
+            -- skip every second point at 20-40min rounds, 2 out of 3 points at 40-60min rounds and so on. 
+            -- always draw the starting point with i == 1
+            if i == 1 or i % graphSkipFrequency == 0 then 
 
-
-			    -- skip first point since table entries start at 0 seconds
+                -- skip first point since there was no pres gain
                 if i ~= 1 then 
-                    table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
-                    table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused + resGainSum, 0)) -- uses resgain of previous loop
-                    resGainSum = 0
+                    table.insert(equippedGraph, Vector(gameSecond, projectedPoint.presEquipped, 0))
+                    table.insert(totalGraph, Vector(gameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
+                    
                 end
+                table.insert(equippedGraph, Vector(gameSecond, entry.presEquipped, 0))
+                table.insert(totalGraph, Vector(gameSecond, entry.presEquipped + entry.presUnused, 0))
 
-                presEquipped = entry.presEquipped
-                presUnused = entry.presUnused
-                graphCeiling = math.max(graphCeiling, presEquipped + presUnused) 
-
-
-                table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
-                table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused, 0))
-
-                -- get seconds until next point to calculate the pres gain by rts
-                if presTable[i+1] == nil then 
-                    nextGameSecond = miscDataTable.gameLengthMinutes * 60
-                else
-                    nextGameSecond = presTable[i+1].gameMinute * 60
-                end
-                local timeBetweenPoints = nextGameSecond - gameSecond
-                resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
-
-                -- gets set back to 0 after drawing a point
-                resGainSum = resGainSum + resGain
+                projectedPoint.presEquipped = entry.presEquipped
+                projectedPoint.presUnused = entry.presUnused
+                projectedPoint.resGain = 0
             end
 
+            -- get seconds until next point to calculate the pres gain by rts
+            if presTable[i+1] == nil then 
+                nextGameSecond = miscDataTable.gameLengthMinutes * 60
+            else
+                nextGameSecond = presTable[i+1].gameMinute * 60
+            end
+            local timeBetweenPoints = nextGameSecond - gameSecond
+
+            local resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
+            projectedPoint.resGain = projectedPoint.resGain + resGain
+            
 		end
 
 		-- last points
-		table.insert(equippedGraph, Vector(nextGameSecond, presEquipped, 0))
-		table.insert(totalGraph, Vector(nextGameSecond, presEquipped + presUnused + resGainSum, 0))
+		table.insert(equippedGraph, Vector(nextGameSecond, projectedPoint.presEquipped, 0))
+		table.insert(totalGraph, Vector(nextGameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
 
 		return graphCeiling
 	end
