@@ -100,7 +100,9 @@ if Server then
                         end
 
                         -- used for counting how many players receive pres
-                        playerCount = playerCount + 1
+                        if not player:GetResources() == 100 then 
+                            playerCount = playerCount + 1
+                        end
 
                     elseif player.previousMapName == "jetpackmarine" then 
                         presEquipped = presEquipped + kJetpackCost
