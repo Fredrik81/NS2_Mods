@@ -2266,7 +2266,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphTextShadow:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphTextShadow)
     self.presGraphTextShadow:SetIsVisible(false)
-    self.presGraphTextShadow:SetText("PRES GRAPH (invested PRes with and without unused PRes) (BETA)")
+    self.presGraphTextShadow:SetText("PRES GRAPH (BETA)")
 
     self.presGraphTextShadow:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphTextShadow:SetTextAlignmentX(GUIItem.Align_Center)
@@ -2279,7 +2279,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetColor(Color(1, 1, 1, 1))
     self.presGraphText:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphText)
-    self.presGraphText:SetText("PRES GRAPH (invested PRes with and without unused PRes) (BETA)")
+    self.presGraphText:SetText("PRES GRAPH (BETA)")
     self.presGraphText:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphText:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
@@ -2412,13 +2412,17 @@ function GUIGameEndStats:Initialize()
     self.presGraph:SetStencilFunc(GUIItem.NotEqual)
 
     self.presGraph:StartLine(1, kBlueColor)
-    self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
+    --self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
     self.presGraph:StartLine(3, kRedColor)
-    self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
+    --self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
+    self.presGraph:StartLine(2, Color(0.12 , 0.30 , 0.66, 1))
+    self.presGraph:StartLine(4, Color(0.66 , 0.2 , 0.2, 1))
 
-    self.presGraphText.tooltip = "Higher lines: also includes unused pres\nLower lines: current invested pres of both teams"
+
+
+    self.presGraphText.tooltip = "Orange: living lifeforms\nRed: unused pres AND living lifeforms\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
