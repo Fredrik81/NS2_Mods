@@ -4632,38 +4632,54 @@ function GUIGameEndStats:ProcessStats()
 		local nextGameSecond
 		local rtAmount
 
+        local gameLength = miscDataTable.gameLengthMinutes
+        local graphSkipFrequency = math.ceil(gameLength / 30) -- counts up for every started 30 min interval. 
+        local resGainSum = 0 -- Sum of pres gain of rts until next drawed point. 
+        local skipCounter = 0
+
+
 		for i = 1, #presTable  do
 			local entry = presTable[i]
 			local gameSecond = entry.gameMinute * 60
 			
-			-- skip first point since table entries start at 0 seconds
-			if i ~= 1 then 
+            -- skip every second point at 30-60min rounds, 2 out of 3 points at 60-90min rounds and so on. 
+            skipCounter = skipCounter + 1
+            if skipCounter % graphSkipFrequency == 0 then 
+
+
+			    -- skip first point since table entries start at 0 seconds
+                if i ~= 1 then 
+                    table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
+                    table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused + resGainSum, 0)) -- uses resgain of previous loop
+                    resGainSum = 0
+                end
+
+                presEquipped = entry.presEquipped
+                presUnused = entry.presUnused
+                graphCeiling = math.max(graphCeiling, presEquipped + presUnused) 
+
+
                 table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
-                table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused + resGain, 0)) -- uses resgain of previous loop
-			end
+                table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused, 0))
 
-			presEquipped = entry.presEquipped
-			presUnused = entry.presUnused
-			graphCeiling = math.max(graphCeiling, presEquipped + presUnused) 
+                -- get seconds until next point to calculate the pres gain by rts
+                if presTable[i+1] == nil then 
+                    nextGameSecond = miscDataTable.gameLengthMinutes * 60
+                else
+                    nextGameSecond = presTable[i+1].gameMinute * 60
+                end
+                local timeBetweenPoints = nextGameSecond - gameSecond
+                resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
 
+                -- gets set back to 0 after drawing a point
+                resGainSum = resGainSum + resGain
+            end
 
-			table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
-			table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused, 0))
-
-
-			if presTable[i+1] == nil then 
-				nextGameSecond = miscDataTable.gameLengthMinutes * 60
-			else
-				nextGameSecond = presTable[i+1].gameMinute * 60
-			end
-			local timeBetweenPoints = nextGameSecond - gameSecond
-			resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
-	
 		end
 
 		-- last points
 		table.insert(equippedGraph, Vector(nextGameSecond, presEquipped, 0))
-		table.insert(totalGraph, Vector(nextGameSecond, presEquipped + presUnused + resGain, 0))
+		table.insert(totalGraph, Vector(nextGameSecond, presEquipped + presUnused + resGainSum, 0))
 
 		return graphCeiling
 	end
