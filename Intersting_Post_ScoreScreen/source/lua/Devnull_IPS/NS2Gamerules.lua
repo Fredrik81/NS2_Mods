@@ -201,7 +201,12 @@ if Server then
 
 
                     if not player:isa("Commander") then
-                        playerCount = playerCount + 1
+
+                         -- used for counting how many players receive pres
+                         if not player:GetResources() == 100 then 
+                            playerCount = playerCount + 1
+                        end
+
                     end
                 end
 

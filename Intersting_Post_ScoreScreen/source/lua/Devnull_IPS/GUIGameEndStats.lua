@@ -2422,7 +2422,7 @@ function GUIGameEndStats:Initialize()
 
 
 
-    self.presGraphText.tooltip = "Orange: living lifeforms\nRed: unused pres AND living lifeforms\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
+    self.presGraphText.tooltip = "Orange: pres of living lifeforms\nRed: unused pres AND living lifeforms\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
