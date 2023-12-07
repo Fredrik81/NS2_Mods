@@ -100,7 +100,9 @@ if Server then
                         end
 
                         -- used for counting how many players receive pres
-                        playerCount = playerCount + 1
+                        if not player:GetResources() == 100 then 
+                            playerCount = playerCount + 1
+                        end
 
                     elseif player.previousMapName == "jetpackmarine" then 
                         presEquipped = presEquipped + kJetpackCost
@@ -141,13 +143,13 @@ if Server then
                     local eggTechId = egg:GetTechId()
                     if eggTechId ~= kTechId.Egg then 
                         if eggTechId == kTechId.GorgeEgg then 
-                            presUnused = presUnused + kGorgeCost
+                            presEquipped = presEquipped + kGorgeCost
                         elseif eggTechId == kTechId.LerkEgg then 
-                            presUnused = presUnused + kLerkCost
+                            presEquipped = presEquipped + kLerkCost
                         elseif eggTechId == kTechId.FadeEgg then 
-                            presUnused = presUnused + kFadeUpgradeCost
+                            presEquipped = presEquipped + kFadeUpgradeCost
                         elseif eggTechId == kTechId.OnosEgg then 
-                            presUnused = presUnused + kOnosCost
+                            presEquipped = presEquipped + kOnosCost
                         end
                     end
                 end
@@ -199,7 +201,12 @@ if Server then
 
 
                     if not player:isa("Commander") then
-                        playerCount = playerCount + 1
+
+                         -- used for counting how many players receive pres
+                         if not player:GetResources() == 100 then 
+                            playerCount = playerCount + 1
+                        end
+
                     end
                 end
 

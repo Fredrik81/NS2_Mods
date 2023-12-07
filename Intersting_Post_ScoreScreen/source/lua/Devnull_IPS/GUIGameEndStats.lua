@@ -2266,7 +2266,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphTextShadow:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphTextShadow)
     self.presGraphTextShadow:SetIsVisible(false)
-    self.presGraphTextShadow:SetText("PRES GRAPH (invested PRes with and without unused PRes) (BETA)")
+    self.presGraphTextShadow:SetText("PRES GRAPH (BETA)")
 
     self.presGraphTextShadow:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphTextShadow:SetTextAlignmentX(GUIItem.Align_Center)
@@ -2279,7 +2279,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetColor(Color(1, 1, 1, 1))
     self.presGraphText:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphText)
-    self.presGraphText:SetText("PRES GRAPH (invested PRes with and without unused PRes) (BETA)")
+    self.presGraphText:SetText("PRES GRAPH (BETA)")
     self.presGraphText:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphText:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
@@ -2412,13 +2412,17 @@ function GUIGameEndStats:Initialize()
     self.presGraph:SetStencilFunc(GUIItem.NotEqual)
 
     self.presGraph:StartLine(1, kBlueColor)
-    self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
+    --self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
     self.presGraph:StartLine(3, kRedColor)
-    self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
+    --self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
+    self.presGraph:StartLine(2, Color(0.12 , 0.30 , 0.66, 1))
+    self.presGraph:StartLine(4, Color(0.66 , 0.2 , 0.2, 1))
 
-    self.presGraphText.tooltip = "Higher lines: also includes unused pres\nLower lines: current invested pres of both teams"
+
+
+    self.presGraphText.tooltip = "Orange: pres of living lifeforms\nRed: unused pres AND living lifeforms\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
@@ -4626,44 +4630,55 @@ function GUIGameEndStats:ProcessStats()
 			return a.gameMinute < b.gameMinute
 		end)
 
-		local presUnused
-        local presEquipped
-		local resGain -- pres gained between 2 table entries
 		local nextGameSecond
-		local rtAmount
+        local gameLength = miscDataTable.gameLengthMinutes
+
+        -- counts up for every started 20 min interval. This limites the lines used in the graph to 1600 lines
+        local graphSkipFrequency = math.ceil(gameLength / 20)
+        
+        -- used to draw the projected point with the resgain
+        local projectedPoint = {}
 
 		for i = 1, #presTable  do
 			local entry = presTable[i]
 			local gameSecond = entry.gameMinute * 60
+
+            graphCeiling = math.max(graphCeiling, entry.presEquipped + entry.presUnused) 
 			
-			-- skip first point since table entries start at 0 seconds
-			if i ~= 1 then 
-                table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
-                table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused + resGain, 0)) -- uses resgain of previous loop
-			end
+            -- skip every second point at 20-40min rounds, 2 out of 3 points at 40-60min rounds and so on. 
+            -- always draw the starting point with i == 1
+            if i == 1 or i % graphSkipFrequency == 0 then 
 
-			presEquipped = entry.presEquipped
-			presUnused = entry.presUnused
-			graphCeiling = math.max(graphCeiling, presEquipped + presUnused) 
+                -- skip first point since there was no pres gain
+                if i ~= 1 then 
+                    table.insert(equippedGraph, Vector(gameSecond, projectedPoint.presEquipped, 0))
+                    table.insert(totalGraph, Vector(gameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
+                    
+                end
+                table.insert(equippedGraph, Vector(gameSecond, entry.presEquipped, 0))
+                table.insert(totalGraph, Vector(gameSecond, entry.presEquipped + entry.presUnused, 0))
 
+                projectedPoint.presEquipped = entry.presEquipped
+                projectedPoint.presUnused = entry.presUnused
+                projectedPoint.resGain = 0
+            end
 
-			table.insert(equippedGraph, Vector(gameSecond, presEquipped, 0))
-			table.insert(totalGraph, Vector(gameSecond, presEquipped + presUnused, 0))
+            -- get seconds until next point to calculate the pres gain by rts
+            if presTable[i+1] == nil then 
+                nextGameSecond = miscDataTable.gameLengthMinutes * 60
+            else
+                nextGameSecond = presTable[i+1].gameMinute * 60
+            end
+            local timeBetweenPoints = nextGameSecond - gameSecond
 
-
-			if presTable[i+1] == nil then 
-				nextGameSecond = miscDataTable.gameLengthMinutes * 60
-			else
-				nextGameSecond = presTable[i+1].gameMinute * 60
-			end
-			local timeBetweenPoints = nextGameSecond - gameSecond
-			resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
-	
+            local resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
+            projectedPoint.resGain = projectedPoint.resGain + resGain
+            
 		end
 
 		-- last points
-		table.insert(equippedGraph, Vector(nextGameSecond, presEquipped, 0))
-		table.insert(totalGraph, Vector(nextGameSecond, presEquipped + presUnused + resGain, 0))
+		table.insert(equippedGraph, Vector(nextGameSecond, projectedPoint.presEquipped, 0))
+		table.insert(totalGraph, Vector(nextGameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
 
 		return graphCeiling
 	end
