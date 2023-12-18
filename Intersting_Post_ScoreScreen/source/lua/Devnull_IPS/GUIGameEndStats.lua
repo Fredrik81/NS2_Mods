@@ -2266,7 +2266,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphTextShadow:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphTextShadow)
     self.presGraphTextShadow:SetIsVisible(false)
-    self.presGraphTextShadow:SetText("PRES GRAPH (BETA)")
+    self.presGraphTextShadow:SetText("PRES GRAPH")
 
     self.presGraphTextShadow:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphTextShadow:SetTextAlignmentX(GUIItem.Align_Center)
@@ -2279,7 +2279,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetColor(Color(1, 1, 1, 1))
     self.presGraphText:SetScale(scaledVector)
     GUIMakeFontScale(self.presGraphText)
-    self.presGraphText:SetText("PRES GRAPH (BETA)")
+    self.presGraphText:SetText("PRES GRAPH")
     self.presGraphText:SetAnchor(GUIItem.Left, GUIItem.Top)
     self.presGraphText:SetTextAlignmentX(GUIItem.Align_Center)
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
@@ -2422,7 +2422,7 @@ function GUIGameEndStats:Initialize()
 
 
 
-    self.presGraphText.tooltip = "Aliens:\nOrange: pres of living lifeforms\nRed: unused pres AND living lifeforms\n\nMarines:\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
+    self.presGraphText.tooltip = "Aliens:\nOrange: pres of currently living lifeforms\nRed: unused pres AND currently living lifeforms\n\nMarines:\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
@@ -4638,13 +4638,12 @@ function GUIGameEndStats:ProcessStats()
         
         -- used to draw the projected point with the resgain
         local projectedPoint = {}
+        projectedPoint.resGain = 0
 
 		for i = 1, #presTable  do
 			local entry = presTable[i]
 			local gameSecond = entry.gameMinute * 60
 
-            graphCeiling = math.max(graphCeiling, entry.presEquipped + entry.presUnused) 
-			
             -- skip every second point at 20-40min rounds, 2 out of 3 points at 40-60min rounds and so on. 
             -- always draw the starting point with i == 1
             if i == 1 or i % graphSkipFrequency == 0 then 
@@ -4660,6 +4659,7 @@ function GUIGameEndStats:ProcessStats()
 
                 projectedPoint.presEquipped = entry.presEquipped
                 projectedPoint.presUnused = entry.presUnused
+                graphCeiling = math.max(graphCeiling, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain) 
                 projectedPoint.resGain = 0
             end
 
@@ -4701,16 +4701,19 @@ function GUIGameEndStats:ProcessStats()
 		self.presGraph:SetPoints(3, self.presGraphs[3])
 		self.presGraph:SetPoints(4, self.presGraphs[4])
 
-		local maxYBounds = math.ceil( graphCeiling / 50 ) * 50 + 100
-		self.presGraph:SetYBounds(0, maxYBounds, true)
+        -- spacing should be around 8-10 and starts overlapping at around 20
+        -- spacing of 20 would be 10 aliens with 3 chamber upgraded onos, each 100 pres unused and multiple onos lifeform eggs..
+        local yGridSpacing = graphCeiling <= 200 and 25 or graphCeiling <= 500 and 50 or 100
+        local maxYBounds = math.ceil( graphCeiling / yGridSpacing ) * yGridSpacing
+        self.presGraph:SetYBounds(0, maxYBounds, true)
+		self.presGraph:SetYGridSpacing(yGridSpacing) 
 
 		local gameLength = miscDataTable.gameLengthMinutes * 60
 		local xSpacing = GetXSpacing(gameLength)
 		self.presGraph:SetXBounds(0, gameLength)
 		self.presGraph:SetXGridSpacing(xSpacing)
 
-		local yGridSpacing = graphCeiling <= 200 and 25 or graphCeiling <= 400 and 50 or graphCeiling <= 800 and 100 or Round(maxYBounds / 8, -2)
-		self.presGraph:SetYGridSpacing(yGridSpacing) 
+		
     end
 
 
