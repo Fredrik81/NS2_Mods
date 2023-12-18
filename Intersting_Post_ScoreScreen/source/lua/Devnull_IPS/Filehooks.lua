@@ -1,5 +1,5 @@
 local DIPS_Name = "D&D - Interesting Post Scoreboard"
-local DIPS_Version = "2.2.7"
+local DIPS_Version = "2.2.8"
 kDevnull_IPS = DIPS_Version
 if Server or Client then
     HPrint(DIPS_Name .. ", version " .. DIPS_Version)
