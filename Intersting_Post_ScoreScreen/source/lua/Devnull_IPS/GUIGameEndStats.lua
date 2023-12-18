@@ -265,8 +265,8 @@ local TopPDmgPlayer = {}
 local TopSDmgPlayer = {}
 local TopBuildTimePlayer = {}
 
-local presGraphTableMarines = {} 
-local presGraphTableAliens = {} 
+local presGraphTableMarines = {}
+local presGraphTableAliens = {}
 
 local function estimateHiveSkillGraph()
     if #hiveSkillGraphTable ~= 0 or #finalStatsTable == 0 then
@@ -1880,6 +1880,14 @@ function GUIGameEndStats:LoadLastRoundStats()
             local parsedFile = json.decode(openedFile:read("*all"))
             io.close(openedFile)
 
+            if parsedFile and parsedFile.miscDataTable and parsedFile.miscDataTable.serverName then
+                local serverName = Client.GetServerIsHidden() and "Hidden" or Client.GetConnectedServerName()
+                if serverName ~= 'Listen Server' and serverName ~= parsedFile.miscDataTable.serverName then
+                    print("Data is not from this server so will not load it.")
+                    return
+                end
+            end
+
             if parsedFile then
                 finalStatsTable = parsedFile.finalStatsTable or {}
                 avgAccTable = parsedFile.avgAccTable or {}
@@ -1895,9 +1903,8 @@ function GUIGameEndStats:LoadLastRoundStats()
                 buildingSummaryTable = parsedFile.buildingSummaryTable or {}
                 statusSummaryTable = parsedFile.statusSummaryTable or {}
 
-		presGraphTableMarines = parsedFile.presGraphTableMarines or {}
-		presGraphTableAliens = parsedFile.presGraphTableAliens or {}
-
+                presGraphTableMarines = parsedFile.presGraphTableMarines or {}
+                presGraphTableAliens = parsedFile.presGraphTableAliens or {}
 
                 if #hiveSkillGraphTable == 0 then
                     estimateHiveSkillGraph()
@@ -1927,9 +1934,8 @@ function GUIGameEndStats:SaveLastRoundStats()
         savedStats.statusSummaryTable = statusSummaryTable
         savedStats.techLogTable = techLogTable
 
-	savedStats.presGraphTableMarines = presGraphTableMarines
-	savedStats.presGraphTableAliens = presGraphTableAliens
-
+        savedStats.presGraphTableMarines = presGraphTableMarines
+        savedStats.presGraphTableAliens = presGraphTableAliens
 
         local savedFile = io.open(lastRoundFile, "w+")
         if savedFile then
@@ -2286,9 +2292,6 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetLayer(kGUILayerMainMenu)
     self.presGraphTextShadow:AddChild(self.presGraphText)
 
-  
-
-
     self.rtGraphText = GUIManager:CreateTextItem()
     self.rtGraphText:SetStencilFunc(GUIItem.NotEqual)
     self.rtGraphText:SetFontName(kTitleFontName)
@@ -2399,7 +2402,7 @@ function GUIGameEndStats:Initialize()
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
 
-    self.presGraph = {} 
+    self.presGraph = {}
     self.presGraph = LineGraph()
     self.presGraph:Initialize()
     self.presGraph:SetAnchor(GUIItem.Middle, GUIItem.Top)
@@ -2417,18 +2420,13 @@ function GUIGameEndStats:Initialize()
     --self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
-    self.presGraph:StartLine(2, Color(0.12 , 0.30 , 0.66, 1))
-    self.presGraph:StartLine(4, Color(0.66 , 0.2 , 0.2, 1))
-
-
+    self.presGraph:StartLine(2, Color(0.12, 0.30, 0.66, 1))
+    self.presGraph:StartLine(4, Color(0.66, 0.2, 0.2, 1))
 
     self.presGraphText.tooltip = "Aliens:\nOrange: pres of currently living lifeforms\nRed: unused pres AND currently living lifeforms\n\nMarines:\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
-
-
-
 
     self.builtRTsComp = ComparisonBarGraph()
     self.builtRTsComp:Initialize()
@@ -2687,7 +2685,7 @@ function GUIGameEndStats:RepositionStats()
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
 
-	local showpresGraph = #self.presGraphs > 0
+    local showpresGraph = #self.presGraphs > 0
     self.presGraphTextShadow:SetIsVisible(showpresGraph)
     self.presGraph:SetIsVisible(showpresGraph)
     if showpresGraph then
@@ -2697,7 +2695,6 @@ function GUIGameEndStats:RepositionStats()
         self.presGraph:SetPosition(Vector((kTitleSize.x - rtGraphSize.x) / 2, yPos, 0))
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
-
 
     self.contentSize = math.max(self.contentSize, yPos)
 end
@@ -4622,103 +4619,93 @@ function GUIGameEndStats:ProcessStats()
 		end
 	end
 	]]
+    local function getPresGraphPoints(teamNumber, presTable, graphCeiling, equippedGraph, totalGraph)
+        table.sort(
+            presTable,
+            function(a, b)
+                return a.gameMinute < b.gameMinute
+            end
+        )
 
-
-	local function getPresGraphPoints(teamNumber, presTable, graphCeiling, equippedGraph, totalGraph)
-
-		table.sort(presTable, function(a, b)
-			return a.gameMinute < b.gameMinute
-		end)
-
-		local nextGameSecond
+        local nextGameSecond
         local gameLength = miscDataTable.gameLengthMinutes
 
         -- counts up for every started 20 min interval. This limites the lines used in the graph to 1600 lines
         local graphSkipFrequency = math.ceil(gameLength / 20)
-        
+
         -- used to draw the projected point with the resgain
         local projectedPoint = {}
         projectedPoint.resGain = 0
 
-		for i = 1, #presTable  do
-			local entry = presTable[i]
-			local gameSecond = entry.gameMinute * 60
+        for i = 1, #presTable do
+            local entry = presTable[i]
+            local gameSecond = entry.gameMinute * 60
 
-            -- skip every second point at 20-40min rounds, 2 out of 3 points at 40-60min rounds and so on. 
+            -- skip every second point at 20-40min rounds, 2 out of 3 points at 40-60min rounds and so on.
             -- always draw the starting point with i == 1
-            if i == 1 or i % graphSkipFrequency == 0 then 
-
+            if i == 1 or i % graphSkipFrequency == 0 then
                 -- skip first point since there was no pres gain
-                if i ~= 1 then 
+                if i ~= 1 then
                     table.insert(equippedGraph, Vector(gameSecond, projectedPoint.presEquipped, 0))
                     table.insert(totalGraph, Vector(gameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
-                    
                 end
                 table.insert(equippedGraph, Vector(gameSecond, entry.presEquipped, 0))
                 table.insert(totalGraph, Vector(gameSecond, entry.presEquipped + entry.presUnused, 0))
 
                 projectedPoint.presEquipped = entry.presEquipped
                 projectedPoint.presUnused = entry.presUnused
-                graphCeiling = math.max(graphCeiling, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain) 
+                graphCeiling = math.max(graphCeiling, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain)
                 projectedPoint.resGain = 0
             end
 
             -- get seconds until next point to calculate the pres gain by rts
-            if presTable[i+1] == nil then 
+            if presTable[i + 1] == nil then
                 nextGameSecond = miscDataTable.gameLengthMinutes * 60
             else
-                nextGameSecond = presTable[i+1].gameMinute * 60
+                nextGameSecond = presTable[i + 1].gameMinute * 60
             end
             local timeBetweenPoints = nextGameSecond - gameSecond
 
-            local resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval 
+            local resGain = entry.rtAmount * entry.playerCount * kPlayerResPerInterval * timeBetweenPoints / kResourceTowerResourceInterval
             projectedPoint.resGain = projectedPoint.resGain + resGain
-            
-		end
+        end
 
-		-- last points
-		table.insert(equippedGraph, Vector(nextGameSecond, projectedPoint.presEquipped, 0))
-		table.insert(totalGraph, Vector(nextGameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
+        -- last points
+        table.insert(equippedGraph, Vector(nextGameSecond, projectedPoint.presEquipped, 0))
+        table.insert(totalGraph, Vector(nextGameSecond, projectedPoint.presEquipped + projectedPoint.presUnused + projectedPoint.resGain, 0))
 
-		return graphCeiling
-	end
+        return graphCeiling
+    end
 
-	-- presGraph Mod
+    -- presGraph Mod
     self.presGraphs = {}
-	if #presGraphTableMarines > 0 and #presGraphTableAliens > 0 then 
+    if #presGraphTableMarines > 0 and #presGraphTableAliens > 0 then
+        self.presGraphs[1] = {} -- Marine equipped pres
+        self.presGraphs[2] = {} -- Marine equipped + saved pres
+        self.presGraphs[3] = {} -- Alien evolved pres
+        self.presGraphs[4] = {} -- Alien evolved + saved pres
+        local graphCeiling = 0
 
-		self.presGraphs[1] = {} -- Marine equipped pres
-		self.presGraphs[2] = {} -- Marine equipped + saved pres
-		self.presGraphs[3] = {} -- Alien evolved pres
-		self.presGraphs[4] = {} -- Alien evolved + saved pres
-		local graphCeiling = 0
+        graphCeiling = getPresGraphPoints(1, presGraphTableMarines, graphCeiling, self.presGraphs[1], self.presGraphs[2])
+        graphCeiling = getPresGraphPoints(2, presGraphTableAliens, graphCeiling, self.presGraphs[3], self.presGraphs[4])
 
-		graphCeiling = getPresGraphPoints(1, presGraphTableMarines, graphCeiling, self.presGraphs[1], self.presGraphs[2])
-		graphCeiling = getPresGraphPoints(2, presGraphTableAliens, graphCeiling, self.presGraphs[3], self.presGraphs[4])
-
-		self.presGraph:SetPoints(1, self.presGraphs[1])
-		self.presGraph:SetPoints(2, self.presGraphs[2])
-		self.presGraph:SetPoints(3, self.presGraphs[3])
-		self.presGraph:SetPoints(4, self.presGraphs[4])
+        self.presGraph:SetPoints(1, self.presGraphs[1])
+        self.presGraph:SetPoints(2, self.presGraphs[2])
+        self.presGraph:SetPoints(3, self.presGraphs[3])
+        self.presGraph:SetPoints(4, self.presGraphs[4])
 
         -- spacing should be around 8-10 and starts overlapping at around 20
         -- spacing of 20 would be 10 aliens with 3 chamber upgraded onos, each 100 pres unused and multiple onos lifeform eggs..
         local yGridSpacing = graphCeiling <= 200 and 25 or graphCeiling <= 500 and 50 or 100
-        local maxYBounds = math.ceil( graphCeiling / yGridSpacing ) * yGridSpacing
+        local maxYBounds = math.ceil(graphCeiling / yGridSpacing) * yGridSpacing
         self.presGraph:SetYBounds(0, maxYBounds, true)
-		self.presGraph:SetYGridSpacing(yGridSpacing) 
+        self.presGraph:SetYGridSpacing(yGridSpacing)
 
-		local gameLength = miscDataTable.gameLengthMinutes * 60
-		local xSpacing = GetXSpacing(gameLength)
-		self.presGraph:SetXBounds(0, gameLength)
-		self.presGraph:SetXGridSpacing(xSpacing)
-
-		
+        local gameLength = miscDataTable.gameLengthMinutes * 60
+        local xSpacing = GetXSpacing(gameLength)
+        self.presGraph:SetXBounds(0, gameLength)
+        self.presGraph:SetXGridSpacing(xSpacing)
     end
-
-
-
-
 
     self:RepositionStats()
 
@@ -5373,12 +5360,11 @@ Client.HookNetworkMessage("TeamSpecificStats", CHUDTeamSpecificStatsLog)
 
 local function CHUDPresGraphAliens(message)
     if message and message.gameMinute then
-        table.insert(presGraphTableAliens, message) 
+        table.insert(presGraphTableAliens, message)
     end
     lastStatsMsg = Shared.GetTime()
 end
 Client.HookNetworkMessage("PresGraphStatsAliens", CHUDPresGraphAliens)
-
 
 -- presGraph Mod
 local function CHUDPresGraphMarines(message)
@@ -5388,4 +5374,3 @@ local function CHUDPresGraphMarines(message)
     lastStatsMsg = Shared.GetTime()
 end
 Client.HookNetworkMessage("PresGraphStatsMarines", CHUDPresGraphMarines)
-
