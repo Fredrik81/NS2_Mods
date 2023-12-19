@@ -2685,7 +2685,7 @@ function GUIGameEndStats:RepositionStats()
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
 
-    local showpresGraph = #self.presGraphs > 0
+    local showpresGraph = self.presGraphs and #self.presGraphs > 0 or false
     self.presGraphTextShadow:SetIsVisible(showpresGraph)
     self.presGraph:SetIsVisible(showpresGraph)
     if showpresGraph then
@@ -5185,7 +5185,7 @@ function GUIGameEndStats:SendKeyEvent(key, down)
             local isVisible = self:GetIsVisible()
             if isVisible then
                 self:SetIsVisible(false)
-            elseif lastDown + kKeyTapTiming > Shared.GetTime() then
+            elseif lastDown + kKeyTapTiming > Shared.GetTime() and loadedLastRound then
                 self:SetIsVisible(true)
             end
         end
