@@ -102,7 +102,7 @@ function GUIMinimap:Update(deltaTime)
         local Player = Client.GetLocalPlayer()
         if GetGameInfoEntity():GetState() == kGameState.Countdown and Player:GetIsOnPlayingTeam() then
             local CurrentCountDown = Player:GetCountDownTime()
-            if (CurrentCountDown < (kCountDownLength - 0.5) and CurrentCountDown > 1.5) or Player:isa("Commander") then
+            if (CurrentCountDown < (kCountDownLength - 0.5) and CurrentCountDown > 1.5) then
                 local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
                 if minimapFrameScript and minimapFrameScript:LargeMapIsVisible() == false then
                     shouldClose = true
