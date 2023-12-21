@@ -102,18 +102,30 @@ function GUIMinimap:Update(deltaTime)
         local Player = Client.GetLocalPlayer()
         if GetGameInfoEntity():GetState() == kGameState.Countdown and Player:GetIsOnPlayingTeam() then
             local CurrentCountDown = Player:GetCountDownTime()
-            if CurrentCountDown < (kCountDownLength - 0.5) and CurrentCountDown > 1.5 then
-                if self.background and self.background:GetIsVisible() == false then
+            if (CurrentCountDown < (kCountDownLength - 0.5) and CurrentCountDown > 1.5) or Player:isa("Commander") then
+                local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
+                if minimapFrameScript and minimapFrameScript:LargeMapIsVisible() == false then
                     shouldClose = true
-                    self:ShowMap(true)
+                    if minimapFrameScript then
+                        minimapFrameScript:ShowMap(true)
+                        minimapFrameScript:SetBackgroundMode((true and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, nil)
+                    end
                 end
             elseif shouldClose then
-                self:ShowMap(false)
+                local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
+                if minimapFrameScript then
+                    minimapFrameScript:ShowMap(false)
+                    minimapFrameScript:SetBackgroundMode((true and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, nil)
+                end
                 shouldClose = nil
             end
         elseif shouldClose and GetGameInfoEntity():GetState() ~= kGameState.Countdown then
-            if self.background:GetIsVisible() then
-                self:ShowMap(false)
+            local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
+            if minimapFrameScript and minimapFrameScript:LargeMapIsVisible() then
+                if minimapFrameScript then
+                    minimapFrameScript:ShowMap(false)
+                    minimapFrameScript:SetBackgroundMode((true and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, nil)
+                end
             end
             shouldClose = nil
         end
