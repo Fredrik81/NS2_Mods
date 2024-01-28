@@ -1880,14 +1880,7 @@ function GUIGameEndStats:LoadLastRoundStats()
             local parsedFile = json.decode(openedFile:read("*all"))
             io.close(openedFile)
 
-            if parsedFile and parsedFile.miscDataTable and parsedFile.miscDataTable.serverName then
-                local serverName = Client.GetServerIsHidden() and "Hidden" or Client.GetConnectedServerName()
-                if serverName ~= 'Listen Server' and serverName ~= parsedFile.miscDataTable.serverName then
-                    print("Data is not from this server so will not load it.")
-                    return
-                end
-            end
-
+    
             if parsedFile then
                 finalStatsTable = parsedFile.finalStatsTable or {}
                 avgAccTable = parsedFile.avgAccTable or {}
@@ -5185,7 +5178,7 @@ function GUIGameEndStats:SendKeyEvent(key, down)
             local isVisible = self:GetIsVisible()
             if isVisible then
                 self:SetIsVisible(false)
-            elseif lastDown + kKeyTapTiming > Shared.GetTime() and loadedLastRound then
+            elseif lastDown + kKeyTapTiming > Shared.GetTime() then
                 self:SetIsVisible(true)
             end
         end
