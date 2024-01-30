@@ -1902,6 +1902,47 @@ function GUIGameEndStats:LoadLastRoundStats()
                 if #hiveSkillGraphTable == 0 then
                     estimateHiveSkillGraph()
                 end
+
+                local vanillaStats = true
+                --  Dirty hack, 209 are Drifters in vanilla, and Skulks in balance mod. A skulk has to die in the game for it to work..
+                for i, v in pairs(equipmentAndLifeformsLogTable) do
+                    if v.techId == 209 then 
+                        vanillaStats = false
+                        
+                    end
+                end
+
+                local balanceServer = false
+                -- Max tech id is 447 in vanilla, 469 in balance mod
+                if kTechId.Max == 469 then
+                    
+                    balanceServer = true
+                end
+
+                --convert vanilla techIds into balancemod techIds
+                if balanceServer and vanillaStats then
+                    for i, v in pairs(equipmentAndLifeformsLogTable) do
+                        if v.techId > kTechId.JetpackTech and v.techId <= kTechId.DeathTrigger then 
+                            v.techId = v.techId - 1
+                        elseif v.techId == ExosuitTech then
+                            v.techId = 448
+                        end
+                    end
+                end
+
+                --convert balance techIds into vanilla techIds
+                if not balanceServer and not vanillaStats then 
+                    for i, v in pairs(equipmentAndLifeformsLogTable) do
+                        if v.techId > kTechId.JetpackTech and v.techId <= kTechId.DeathTrigger then 
+                            v.techId = v.techId + 1
+                        elseif v.techId == ExosuitTech then
+                            v.techId = 142
+                        end
+                    end
+                end
+
+
+
             end
 
             self.saved = true
