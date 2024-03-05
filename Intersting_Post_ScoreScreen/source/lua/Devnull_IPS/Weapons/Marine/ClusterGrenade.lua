@@ -1,5 +1,5 @@
 if Server then
     function ClusterGrenade:OnDestroy()
-        StatsUI_RegisterLost(kTechId.ClusterGrenade, 1)
+        StatsUI_RegisterLost(kTechId.ClusterGrenade)
     end
 end

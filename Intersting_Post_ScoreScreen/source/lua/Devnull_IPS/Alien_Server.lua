@@ -147,7 +147,7 @@ function Alien:ProcessBuyAction(techIds)
                     --print("Bought (" .. tostring(lifeFormTechId) .. "):" .. EnumToString(kTechId, lifeFormTechId) ", OLD (" .. tostring(oldLifeFormTechId) .. "):" .. EnumToString(kTechId, oldLifeFormTechId))
                     --print("Bought (" .. tostring(lifeFormTechId) .. "), OLD (" .. tostring(oldLifeFormTechId) .. ")")
                     --print("Sending to StatsUI_RegisterPurchase")
-                    StatsUI_RegisterPurchase(lifeFormTechId, 2)
+                    StatsUI_RegisterPurchase(lifeFormTechId)
                     --print("sent...")
                     newPlayer.oneHive = false
                     newPlayer.twoHives = false

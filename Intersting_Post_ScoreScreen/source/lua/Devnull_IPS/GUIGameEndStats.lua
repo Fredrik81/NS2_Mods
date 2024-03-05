@@ -5114,6 +5114,8 @@ local function CHUDEquipmentAndLifeformsLog(message)
         entry.buyCount = message.buyCount
         entry.lostCount = message.lostCount
         table.insert(equipmentAndLifeformsLogTable, entry)
+        print("Got entry: " .. dump(entry))
+        print("Total: " .. dump(equipmentAndLifeformsLogTable))
     end
 
     lastStatsMsg = Shared.GetTime()

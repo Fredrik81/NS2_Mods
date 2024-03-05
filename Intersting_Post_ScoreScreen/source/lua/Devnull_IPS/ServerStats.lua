@@ -868,14 +868,10 @@ function StatsUI_FormatRoundStats()
 	end
 
 	local newBuildingSummaryTable = {}
-	--print("STATS_BuildingSummary: " .. dump(STATS_BuildingSummary))
-
- 	for teamNumber, team in pairs(STATS_BuildingSummary) do
+	for teamNumber, team in pairs(STATS_BuildingSummary) do
 		for techId, entry in pairs(team) do
 			entry.teamNumber = teamNumber
 			entry.techId = EnumToString(kTechId, techId)
-			--print("techID: " .. tostring(techId))
-			--print("entry: " .. dump(entry))
 			table.insert(newBuildingSummaryTable, entry)
 		end
 	end
@@ -1020,25 +1016,12 @@ function StatsUI_SendTeamStats()
 
 	-- Alien Code...
 	for _, entry in ipairs(STATS_KillGraph) do
-		local eal_entry = {}
-		if entry.killerTeamNumber == 1 then
-			eal_entry.teamNumber = 2
-			eal_entry.name = EnumToString(kTechId, stringToTechID[entry.victimClass])
-			eal_entry.destroyed = true
-		elseif entry.killerTeamNumber == 2 then
-			eal_entry.teamNumber = 1
-			eal_entry.name = EnumToString(kTechId, stringToTechID[entry.victimClass])
-			eal_entry.destroyed = true
-		end
-
-		if eal_entry.teamNumber and eal_entry.techId then
-			table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+		if stringToTechID[entry.victimClass] then
+			StatsUI_RegisterLost(stringToTechID[entry.victimClass])
 		end
 	end
 
-	--Send all EQ and Lifeforms
 	local EaL_Data = {}
-	print("STATS_EquipmentAndLifeforms: " .. dump(STATS_EquipmentAndLifeforms))
 	for index, row in ipairs(STATS_EquipmentAndLifeforms) do
 		if not EaL_Data[row.name] then
 			EaL_Data[row.name] = {}
@@ -1053,8 +1036,8 @@ function StatsUI_SendTeamStats()
 		end
 	end
 
+	--Send all EQ and Lifeforms
 	print("Send EALStats: " .. dump(EaL_Data))
-
 	for _, entry in ipairs(EaL_Data) do
 		Server.SendNetworkMessage("EalStats", entry, true)
 	end
@@ -1346,28 +1329,34 @@ end
 StatsUI_ResetStats()
 
 -- MY extra functions etc
-function StatsUI_RegisterPurchase(TechId, teamNumber)
-	--print("TechId purchase: " .. tostring(TechId) .. "(Team: ".. tostring(teamNumber) .. ")")
+function StatsUI_RegisterPurchase(TechId)
+	--print("TechId purchase: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
 	if not GetGamerules():GetGameStarted() then
 		return
 	end
 	local eal_entry = {}
-	eal_entry.teamNumber = teamNumber
 	eal_entry.name = EnumToString(kTechId, TechId)
 	eal_entry.destroyed = false
-	table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	if eal_entry.name then
+		table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	end
+	--print("RegisterPurchase: " .. dump(eal_entry))
+	--print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
 end
 
-function StatsUI_RegisterLost(TechId, teamNumber)
-	--print("TechId lost: " .. tostring(TechId) .. "(Team: ".. tostring(teamNumber) .. ")")
+function StatsUI_RegisterLost(TechId)
+	--print("TechId lost: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
 	if not GetGamerules():GetGameStarted() then
 		return
 	end
 	local eal_entry = {}
-	eal_entry.teamNumber = teamNumber
 	eal_entry.name = EnumToString(kTechId, TechId)
 	eal_entry.destroyed = true
-	table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	if eal_entry.name then
+		table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	end
+	--print("RegisterLoss: " .. dump(eal_entry))
+	--print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
 end
 
 function StatsUI_RegisterTSS(TechName, msg)
