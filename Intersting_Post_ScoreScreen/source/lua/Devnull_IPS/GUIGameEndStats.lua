@@ -5110,9 +5110,9 @@ end
 local function CHUDEquipmentAndLifeformsLog(message)
     if message and message.teamNumber then
         local entry = {}
-        entry.teamNumber = message.teamNumber
-        entry.techId = message.techId
-        entry.destroyed = message.destroyed
+        entry.name = message.name
+        entry.buyCount = message.buyCount
+        entry.lostCount = message.lostCount
         table.insert(equipmentAndLifeformsLogTable, entry)
     end
 
@@ -5389,7 +5389,7 @@ Client.HookNetworkMessage("RTGraph", CHUDSetRTGraph)
 Client.HookNetworkMessage("KillGraph", CHUDSetKillGraph)
 Client.HookNetworkMessage("TechLog", CHUDSetTechLog)
 Client.HookNetworkMessage("BuildingSummary", CHUDSetBuildingSummary)
-Client.HookNetworkMessage("EquipmentAndLifeforms", CHUDEquipmentAndLifeformsLog)
+Client.HookNetworkMessage("EalStats", CHUDEquipmentAndLifeformsLog)
 Client.HookNetworkMessage("TeamSpecificStats", CHUDTeamSpecificStatsLog)
 
 local function CHUDPresGraphAliens(message)

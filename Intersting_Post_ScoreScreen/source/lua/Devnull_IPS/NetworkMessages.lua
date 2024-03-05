@@ -1,11 +1,11 @@
 --HPrint("=========Loaded NetworkMessages.lua hook==============")
 
-local kEquipmentAndLifeforms = {
-    teamNumber = "integer (1 to 2)",
-    techId = "enum kTechId",
-    destroyed = "boolean"
+local kEalStats = {
+    name = string.format("string (%d)", 20),
+    buyCount = "integer",
+    lostCount = "integer"
 }
-Shared.RegisterNetworkMessage("EquipmentAndLifeforms", kEquipmentAndLifeforms)
+Shared.RegisterNetworkMessage("EalStats", kEalStats)
 
 local kPlayerStatsMessage = {
     isMarine = "boolean",

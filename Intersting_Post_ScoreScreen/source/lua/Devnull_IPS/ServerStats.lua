@@ -718,7 +718,6 @@ function StatsUI_ResetStats()
 	STATS_PresGraphAliens = {}
 	STATS_PresGraphMarines = {}
 
-
 	-- Do this so we can spawn items without a commander with cheats on
 	StatsUI_SetMarineCommmaderSteamID(0)
 	StatsUI_ResetCommStats(StatsUI_GetMarineCommmaderSteamID())
@@ -869,10 +868,14 @@ function StatsUI_FormatRoundStats()
 	end
 
 	local newBuildingSummaryTable = {}
-	for teamNumber, team in pairs(STATS_BuildingSummary) do
+	--print("STATS_BuildingSummary: " .. dump(STATS_BuildingSummary))
+
+ 	for teamNumber, team in pairs(STATS_BuildingSummary) do
 		for techId, entry in pairs(team) do
 			entry.teamNumber = teamNumber
 			entry.techId = EnumToString(kTechId, techId)
+			--print("techID: " .. tostring(techId))
+			--print("entry: " .. dump(entry))
 			table.insert(newBuildingSummaryTable, entry)
 		end
 	end
@@ -1018,15 +1021,13 @@ function StatsUI_SendTeamStats()
 	-- Alien Code...
 	for _, entry in ipairs(STATS_KillGraph) do
 		local eal_entry = {}
-		-- print("entry.victimClass: " .. tostring(entry.victimClass))
-		-- print("classNameToTechId[entry.victimClass]: " .. tostring(stringToTechID[entry.victimClass]))
 		if entry.killerTeamNumber == 1 then
 			eal_entry.teamNumber = 2
-			eal_entry.techId = stringToTechID[entry.victimClass]
+			eal_entry.name = EnumToString(kTechId, stringToTechID[entry.victimClass])
 			eal_entry.destroyed = true
 		elseif entry.killerTeamNumber == 2 then
 			eal_entry.teamNumber = 1
-			eal_entry.techId = stringToTechID[entry.victimClass]
+			eal_entry.name = EnumToString(kTechId, stringToTechID[entry.victimClass])
 			eal_entry.destroyed = true
 		end
 
@@ -1036,8 +1037,26 @@ function StatsUI_SendTeamStats()
 	end
 
 	--Send all EQ and Lifeforms
-	for _, entry in ipairs(STATS_EquipmentAndLifeforms) do
-		Server.SendNetworkMessage("EquipmentAndLifeforms", entry, true)
+	local EaL_Data = {}
+	print("STATS_EquipmentAndLifeforms: " .. dump(STATS_EquipmentAndLifeforms))
+	for index, row in ipairs(STATS_EquipmentAndLifeforms) do
+		if not EaL_Data[row.name] then
+			EaL_Data[row.name] = {}
+			EaL_Data[row.name].name = row.name
+			EaL_Data[row.name].lostCount = 0
+			EaL_Data[row.name].buyCount = 0
+		end
+		if row.destroyed then
+			EaL_Data[row.name].lostCount = EaL_Data[row.name].lostCount + 1
+		else
+			EaL_Data[row.name].buyCount = EaL_Data[row.name].buyCount + 1
+		end
+	end
+
+	print("Send EALStats: " .. dump(EaL_Data))
+
+	for _, entry in ipairs(EaL_Data) do
+		Server.SendNetworkMessage("EalStats", entry, true)
 	end
 
 	--Team Specific Stats --todois
@@ -1083,7 +1102,6 @@ function StatsUI_SendTeamStats()
 	for _, entry in ipairs(STATS_PresGraphAliens) do
 		Server.SendNetworkMessage("PresGraphStatsAliens", entry, true)
 	end
-
 end
 
 local function GetServerMods()
@@ -1335,7 +1353,7 @@ function StatsUI_RegisterPurchase(TechId, teamNumber)
 	end
 	local eal_entry = {}
 	eal_entry.teamNumber = teamNumber
-	eal_entry.techId = TechId
+	eal_entry.name = EnumToString(kTechId, TechId)
 	eal_entry.destroyed = false
 	table.insert(STATS_EquipmentAndLifeforms, eal_entry)
 end
@@ -1347,7 +1365,7 @@ function StatsUI_RegisterLost(TechId, teamNumber)
 	end
 	local eal_entry = {}
 	eal_entry.teamNumber = teamNumber
-	eal_entry.techId = TechId
+	eal_entry.name = EnumToString(kTechId, TechId)
 	eal_entry.destroyed = true
 	table.insert(STATS_EquipmentAndLifeforms, eal_entry)
 end
@@ -1392,8 +1410,6 @@ function StatsUI_RegisterTSS(TechName, msg)
 	--print("- Current value: " .. tostring(STATS_TeamSpecificStats[TechName][msg.steamId]))
 end
 
-
-
 local STATS_PresGraph = {}
 function STATSUI_PresGraphAliens(presUnused, presEquipped, rtAmount, playerCount)
 	table.insert(
@@ -1402,8 +1418,8 @@ function STATSUI_PresGraphAliens(presUnused, presEquipped, rtAmount, playerCount
 			presUnused = presUnused,
 			rtAmount = rtAmount,
 			presEquipped = presEquipped,
-			gameMinute = GetGameTime(true), 
-			playerCount = playerCount, -- doesnt count the commander
+			gameMinute = GetGameTime(true),
+			playerCount = playerCount -- doesnt count the commander
 		}
 	)
 end
@@ -1414,8 +1430,8 @@ function STATSUI_PresGraphMarines(presUnused, presEquipped, rtAmount, playerCoun
 			presUnused = presUnused,
 			rtAmount = rtAmount,
 			presEquipped = presEquipped,
-			gameMinute = GetGameTime(true), 
-			playerCount = playerCount, -- doesnt count the commander
+			gameMinute = GetGameTime(true),
+			playerCount = playerCount -- doesnt count the commander
 		}
 	)
 end
