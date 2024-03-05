@@ -5108,7 +5108,7 @@ local function CHUDSetKillGraph(message)
 end
 
 local function CHUDEquipmentAndLifeformsLog(message)
-    if message and message.teamNumber then
+    if message and message.name then
         local entry = {}
         entry.name = message.name
         entry.buyCount = message.buyCount
