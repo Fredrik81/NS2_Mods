@@ -4,9 +4,9 @@ if Server then
             layout = self.layout
         }
         if self:GetHasMinigun() then
-            StatsUI_RegisterLost(kTechId.DualMinigunExosuit, 1)
+            StatsUI_RegisterLost(kTechId.DualMinigunExosuit)
         else
-            StatsUI_RegisterLost(kTechId.DualRailgunExosuit, 1)
+            StatsUI_RegisterLost(kTechId.DualRailgunExosuit)
         end
 
         Player.OnKill(self, attacker, doer, point, direction)

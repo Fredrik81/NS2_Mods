@@ -1880,7 +1880,6 @@ function GUIGameEndStats:LoadLastRoundStats()
             local parsedFile = json.decode(openedFile:read("*all"))
             io.close(openedFile)
 
-    
             if parsedFile then
                 finalStatsTable = parsedFile.finalStatsTable or {}
                 avgAccTable = parsedFile.avgAccTable or {}
@@ -1906,23 +1905,21 @@ function GUIGameEndStats:LoadLastRoundStats()
                 local vanillaStats = true
                 --  Dirty hack, 209 are Drifters in vanilla, and Skulks in balance mod. A skulk has to die in the game for it to work..
                 for i, v in pairs(equipmentAndLifeformsLogTable) do
-                    if v.techId == 209 then 
+                    if v.techId == 209 then
                         vanillaStats = false
-                        
                     end
                 end
 
                 local balanceServer = false
                 -- Max tech id is 447 in vanilla, 469 in balance mod
                 if kTechId.Max == 469 then
-                    
                     balanceServer = true
                 end
 
                 --convert vanilla techIds into balancemod techIds
                 if balanceServer and vanillaStats then
                     for i, v in pairs(equipmentAndLifeformsLogTable) do
-                        if v.techId > kTechId.JetpackTech and v.techId <= kTechId.DeathTrigger then 
+                        if v.techId > kTechId.JetpackTech and v.techId <= kTechId.DeathTrigger then
                             v.techId = v.techId - 1
                         elseif v.techId == ExosuitTech then
                             v.techId = 448
@@ -1931,18 +1928,15 @@ function GUIGameEndStats:LoadLastRoundStats()
                 end
 
                 --convert balance techIds into vanilla techIds
-                if not balanceServer and not vanillaStats then 
+                if not balanceServer and not vanillaStats then
                     for i, v in pairs(equipmentAndLifeformsLogTable) do
-                        if v.techId > kTechId.JetpackTech and v.techId <= kTechId.DeathTrigger then 
+                        if v.techId > kTechId.JetpackTech and v.techId <= kTechId.DeathTrigger then
                             v.techId = v.techId + 1
                         elseif v.techId == ExosuitTech then
                             v.techId = 142
                         end
                     end
                 end
-
-
-
             end
 
             self.saved = true
@@ -3254,10 +3248,19 @@ local function enumContainsKey(enum, StringValue)
     return false
 end
 
+function GetEalEntry(techName)
+    for index, row in ipairs(equipmentAndLifeformsLogTable) do
+        if row.name == techName then
+            return row
+        end
+    end
+    return nil
+end
+
 function GUIGameEndStats:BuildEALGraph()
     self.topPlayersCards.ealcards = {}
     if self.equipmentAndLifeformsTextShadow:GetIsVisible() then
-        local techId = ""
+        local techName = ""
         local equipmentAndLifeformsAlienCard = self:CreateEALGraphicHeader("Lifeforms", kAlienStatsColor, kAlienStatsLogo, Vector(10, 10, 0), kLogoSize.x, kLogoSize.y, "EVOLVED", "LOST")
         equipmentAndLifeformsAlienCard.rows = {}
         equipmentAndLifeformsAlienCard.teamNumber = -2
@@ -3269,102 +3272,79 @@ function GUIGameEndStats:BuildEALGraph()
         end
 
         -- Skulks
-        techId = kTechId.Skulk
+        techName = "Skulk"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 0, 340, 114 * 1}, Vector(90, 30, 0), 0, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 0, 340, 114 * 1}, Vector(90, 30, 0), 0, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Gorges
-        techId = kTechId.Gorge
+        techName = "Gorge"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 1, 340, 114 * 2}, Vector(90, 30, 0), 1, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 1, 340, 114 * 2}, Vector(90, 30, 0), 1, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Lerks
-        techId = kTechId.Lerk
+        techName = "Lerk"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 2, 340, 114 * 3}, Vector(90, 30, 0), 2, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 2, 340, 114 * 3}, Vector(90, 30, 0), 2, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards, itemCard)
 
         -- Fade
-        techId = kTechId.Fade
+        techName = "Fade"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 3, 340, 114 * 4}, Vector(90, 30, 0), 3, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 3, 340, 114 * 4}, Vector(90, 30, 0), 3, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Onos
-        techId = kTechId.Onos
+        techName = "Onos"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 4, 340, 114 * 5}, Vector(90, 30, 0), 4, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 4, 340, 114 * 5}, Vector(90, 30, 0), 4, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Prowler
         if enumContainsKey(kTechId, "Prowler") then --kTechId["Prowler"] ~= nil then
+            ealEntry = GetEalEntry("Prowler")
             local buyCount = 0
             local lostCount = 0
-            for index, row in ipairs(equipmentAndLifeformsLogTable) do
-                if row.techId == kTechId["Prowler"] then
-                    if row.destroyed then
-                        lostCount = lostCount + 1
-                    else
-                        buyCount = buyCount + 1
-                    end
-                end
+            if ealEntry then
+                buyCount = ealEntry.buyCount
+                lostCount = ealEntry.lostCount
             end
             local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 5, 340, 114 * 6}, Vector(90, 30, 0), 5, false, "Prowler")
             table.insert(self.toolTipCards, itemCard.icon)
@@ -3372,98 +3352,80 @@ function GUIGameEndStats:BuildEALGraph()
         end
 
         -- Crag
-        techId = kTechId.Crag
+        techName = "Crag"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        if #buildingSummaryTable > 0 then
-            for index, row in ipairs(buildingSummaryTable) do
-                if row.name == "Crag" then
-                    lostCount = row.lost
-                    buyCount = row.built
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 10, 340, 114 * 11}, Vector(90, 30, 0), 6, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 10, 340, 114 * 11}, Vector(90, 30, 0), 6, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Shade
-        techId = kTechId.Shade
+        techName = "Shade"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        if #buildingSummaryTable > 0 then
-            for index, row in ipairs(buildingSummaryTable) do
-                if row.name == "Shade" then
-                    lostCount = row.lost
-                    buyCount = row.built
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 11, 340, 114 * 12}, Vector(90, 30, 0), 6.74, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 11, 340, 114 * 12}, Vector(90, 30, 0), 6.74, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Shift
-        techId = kTechId.Shift
+        techName = "Shift"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        if #buildingSummaryTable > 0 then
-            for index, row in ipairs(buildingSummaryTable) do
-                if row.name == "Shift" then
-                    lostCount = row.lost
-                    buyCount = row.built
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 9, 340, 114 * 10}, Vector(90, 30, 0), 7.5, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 9, 340, 114 * 10}, Vector(90, 30, 0), 7.5, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Shell
-        techId = kTechId.Shell
+        techName = "Shell"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        if #buildingSummaryTable > 0 then
-            for index, row in ipairs(buildingSummaryTable) do
-                if row.name == "Shell" then
-                    lostCount = row.lost
-                    buyCount = row.built
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(90, 30, 0), 8.5, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(90, 30, 0), 8.5, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Veil
-        techId = kTechId.Veil
+        techName = "Veil"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        if #buildingSummaryTable > 0 then
-            for index, row in ipairs(buildingSummaryTable) do
-                if row.name == "Veil" then
-                    lostCount = row.lost
-                    buyCount = row.built
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(90, 30, 0), 9.25, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(90, 30, 0), 9.25, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Spur
-        techId = kTechId.Spur
+        techName = "Spur"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        if #buildingSummaryTable > 0 then
-            for index, row in ipairs(buildingSummaryTable) do
-                if row.name == "Spur" then
-                    lostCount = row.lost
-                    buyCount = row.built
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(90, 30, 0), 10, false, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsAlienCard.background, buyCount, lostCount, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(90, 30, 0), 10, false, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
@@ -3478,206 +3440,158 @@ function GUIGameEndStats:BuildEALGraph()
         end
 
         -- Shotgun
-        techId = kTechId.Shotgun
+        techName = "Shotgun"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 2, 340, 114 * 3}, Vector(90, 30, 0), 0, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 2, 340, 114 * 3}, Vector(90, 30, 0), 0, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
-        -- GL
-        techId = kTechId.GrenadeLauncher
+        -- GrenadeLauncher
+        techName = "GrenadeLauncher"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 3, 340, 114 * 4}, Vector(90, 30, 0), 1, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 3, 340, 114 * 4}, Vector(90, 30, 0), 1, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Flamer
-        techId = kTechId.Flamethrower
+        techName = "Flamethrower"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 4, 340, 114 * 5}, Vector(90, 30, 0), 2, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 4, 340, 114 * 5}, Vector(90, 30, 0), 2, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
-        -- HMG
-        techId = kTechId.HeavyMachineGun
+        -- HeavyMachineGun
+        techName = "HeavyMachineGun"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 5, 340, 114 * 6}, Vector(90, 30, 0), 3, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 5, 340, 114 * 6}, Vector(90, 30, 0), 3, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- JetPack
-        techId = kTechId.Jetpack
+        techName = "Jetpack"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 12, 340, 114 * 13}, Vector(90, 30, 0), 4.25, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 12, 340, 114 * 13}, Vector(90, 30, 0), 4.25, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Exo Minigun
-        techId = kTechId.DualMinigunExosuit
+        techName = "DualMinigunExosuit"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 14, 340, 114 * 15}, Vector(90, 30, 0), 5, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 14, 340, 114 * 15}, Vector(90, 30, 0), 5, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Exo Railgun
-        techId = kTechId.DualRailgunExosuit
+        techName = "DualRailgunExosuit"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 13, 340, 114 * 14}, Vector(90, 30, 0), 5.75, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 13, 340, 114 * 14}, Vector(90, 30, 0), 5.75, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Welder
-        techId = kTechId.Welder
+        techName = "Welder"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 7, 340, 114 * 8}, Vector(90, 30, 0), 7, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 7, 340, 114 * 8}, Vector(90, 30, 0), 7, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Gas Grenade
-        techId = kTechId.GasGrenade
+        techName = "GasGrenade"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 8, 340, 114 * 9}, Vector(90, 30, 0), 7.75, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 8, 340, 114 * 9}, Vector(90, 30, 0), 7.75, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Cluster
-        techId = kTechId.ClusterGrenade
+        techName = "ClusterGrenade"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 9, 340, 114 * 10}, Vector(90, 30, 0), 8.5, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 9, 340, 114 * 10}, Vector(90, 30, 0), 8.5, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Pulse
-        techId = kTechId.PulseGrenade
+        techName = "PulseGrenade"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 10, 340, 114 * 11}, Vector(90, 30, 0), 9.25, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 10, 340, 114 * 11}, Vector(90, 30, 0), 9.25, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
 
         -- Mine
-        techId = kTechId.LayMines
+        techName = "LayMines"
+        ealEntry = GetEalEntry(techName)
         local buyCount = 0
         local lostCount = 0
-        for index, row in ipairs(equipmentAndLifeformsLogTable) do
-            if row.techId == techId then
-                if row.destroyed then
-                    lostCount = lostCount + 1
-                else
-                    buyCount = buyCount + 1
-                end
-            end
+        if ealEntry then
+            buyCount = ealEntry.buyCount
+            lostCount = ealEntry.lostCount
         end
-        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 11, 340, 114 * 12}, Vector(90, 30, 0), 10, true, Locale.ResolveString(LookupTechData(techId, kTechDataDisplayName, "unknown")))
+        local itemCard = CreateEalIcon(equipmentAndLifeformsMarineCard.background, buyCount, lostCount, kEalMarineArmoryTexture, {0, 114 * 11, 340, 114 * 12}, Vector(90, 30, 0), 10, true, Locale.ResolveString(LookupTechData(kTechId[techName], kTechDataDisplayName, "unknown")))
         table.insert(self.toolTipCards, itemCard.icon)
         table.insert(self.topPlayersCards.ealcards, itemCard)
         self.topEalCards.Aliens = equipmentAndLifeformsAlienCard
@@ -5108,11 +5022,11 @@ local function CHUDSetKillGraph(message)
 end
 
 local function CHUDEquipmentAndLifeformsLog(message)
-    if message and message.teamNumber then
+    if message and message.name then
         local entry = {}
-        entry.teamNumber = message.teamNumber
-        entry.techId = message.techId
-        entry.destroyed = message.destroyed
+        entry.name = message.name
+        entry.buyCount = message.buyCount
+        entry.lostCount = message.lostCount
         table.insert(equipmentAndLifeformsLogTable, entry)
     end
 
@@ -5389,7 +5303,7 @@ Client.HookNetworkMessage("RTGraph", CHUDSetRTGraph)
 Client.HookNetworkMessage("KillGraph", CHUDSetKillGraph)
 Client.HookNetworkMessage("TechLog", CHUDSetTechLog)
 Client.HookNetworkMessage("BuildingSummary", CHUDSetBuildingSummary)
-Client.HookNetworkMessage("EquipmentAndLifeforms", CHUDEquipmentAndLifeformsLog)
+Client.HookNetworkMessage("EalStats", CHUDEquipmentAndLifeformsLog)
 Client.HookNetworkMessage("TeamSpecificStats", CHUDTeamSpecificStatsLog)
 
 local function CHUDPresGraphAliens(message)

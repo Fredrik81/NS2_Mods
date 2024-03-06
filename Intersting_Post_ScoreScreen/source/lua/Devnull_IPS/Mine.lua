@@ -1,6 +1,6 @@
 local orgMineDestroy = Mine.OnDestroy
 function Mine:OnDestroy()
-    StatsUI_RegisterLost(kTechId.LayMines, 1)
+    StatsUI_RegisterLost(kTechId.LayMines)
     orgMineDestroy(self)
 end
 

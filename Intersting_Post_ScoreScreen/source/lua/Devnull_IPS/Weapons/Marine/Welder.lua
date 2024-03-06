@@ -1,6 +1,6 @@
 if Server then
     function Welder:OnDestroy()
-        StatsUI_RegisterLost(kTechId.Welder, 1)
+        StatsUI_RegisterLost(kTechId.Welder)
     end
 end
 

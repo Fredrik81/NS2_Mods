@@ -25,7 +25,7 @@ function Player:ProcessBuyAction(techIds)
     if totalCost <= self:GetResources() then
         for i, techId in ipairs(validBuyIds) do
             --print("Bought (" .. tostring(techId) .. "):" .. EnumToString(kTechId, techId))
-            StatsUI_RegisterPurchase(techId, 1)
+            StatsUI_RegisterPurchase(techId)
         end
 
         if self:AttemptToBuy(validBuyIds) then

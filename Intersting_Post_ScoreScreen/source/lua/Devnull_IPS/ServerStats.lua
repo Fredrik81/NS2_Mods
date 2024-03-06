@@ -718,7 +718,6 @@ function StatsUI_ResetStats()
 	STATS_PresGraphAliens = {}
 	STATS_PresGraphMarines = {}
 
-
 	-- Do this so we can spawn items without a commander with cheats on
 	StatsUI_SetMarineCommmaderSteamID(0)
 	StatsUI_ResetCommStats(StatsUI_GetMarineCommmaderSteamID())
@@ -1017,27 +1016,32 @@ function StatsUI_SendTeamStats()
 
 	-- Alien Code...
 	for _, entry in ipairs(STATS_KillGraph) do
-		local eal_entry = {}
-		-- print("entry.victimClass: " .. tostring(entry.victimClass))
-		-- print("classNameToTechId[entry.victimClass]: " .. tostring(stringToTechID[entry.victimClass]))
-		if entry.killerTeamNumber == 1 then
-			eal_entry.teamNumber = 2
-			eal_entry.techId = stringToTechID[entry.victimClass]
-			eal_entry.destroyed = true
-		elseif entry.killerTeamNumber == 2 then
-			eal_entry.teamNumber = 1
-			eal_entry.techId = stringToTechID[entry.victimClass]
-			eal_entry.destroyed = true
+		if stringToTechID[entry.victimClass] then
+			StatsUI_RegisterLost(stringToTechID[entry.victimClass])
 		end
+	end
 
-		if eal_entry.teamNumber and eal_entry.techId then
-			table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	local EaL_Data = {}
+	for index, row in ipairs(STATS_EquipmentAndLifeforms) do
+		if not EaL_Data[row.name] then
+			EaL_Data[row.name] = {}
+			EaL_Data[row.name].name = row.name
+			EaL_Data[row.name].lostCount = 0
+			EaL_Data[row.name].buyCount = 0
+		end
+		if row.destroyed then
+			EaL_Data[row.name].lostCount = EaL_Data[row.name].lostCount + 1
+		else
+			EaL_Data[row.name].buyCount = EaL_Data[row.name].buyCount + 1
 		end
 	end
 
 	--Send all EQ and Lifeforms
-	for _, entry in ipairs(STATS_EquipmentAndLifeforms) do
-		Server.SendNetworkMessage("EquipmentAndLifeforms", entry, true)
+	--print("Send EALStats: " .. dump(EaL_Data))
+	--print("Type: " .. type(EaL_Data))
+	for _, entry in pairs(EaL_Data) do
+		--print("Sending entry: " .. dump(entry))
+		Server.SendNetworkMessage("EalStats", entry, true)
 	end
 
 	--Team Specific Stats --todois
@@ -1083,7 +1087,6 @@ function StatsUI_SendTeamStats()
 	for _, entry in ipairs(STATS_PresGraphAliens) do
 		Server.SendNetworkMessage("PresGraphStatsAliens", entry, true)
 	end
-
 end
 
 local function GetServerMods()
@@ -1328,28 +1331,34 @@ end
 StatsUI_ResetStats()
 
 -- MY extra functions etc
-function StatsUI_RegisterPurchase(TechId, teamNumber)
-	--print("TechId purchase: " .. tostring(TechId) .. "(Team: ".. tostring(teamNumber) .. ")")
+function StatsUI_RegisterPurchase(TechId)
+	--print("TechId purchase: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
 	if not GetGamerules():GetGameStarted() then
 		return
 	end
 	local eal_entry = {}
-	eal_entry.teamNumber = teamNumber
-	eal_entry.techId = TechId
+	eal_entry.name = EnumToString(kTechId, TechId)
 	eal_entry.destroyed = false
-	table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	if eal_entry.name then
+		table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	end
+	--print("RegisterPurchase: " .. dump(eal_entry))
+	--print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
 end
 
-function StatsUI_RegisterLost(TechId, teamNumber)
-	--print("TechId lost: " .. tostring(TechId) .. "(Team: ".. tostring(teamNumber) .. ")")
+function StatsUI_RegisterLost(TechId)
+	--print("TechId lost: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
 	if not GetGamerules():GetGameStarted() then
 		return
 	end
 	local eal_entry = {}
-	eal_entry.teamNumber = teamNumber
-	eal_entry.techId = TechId
+	eal_entry.name = EnumToString(kTechId, TechId)
 	eal_entry.destroyed = true
-	table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	if eal_entry.name then
+		table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+	end
+	--print("RegisterLoss: " .. dump(eal_entry))
+	--print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
 end
 
 function StatsUI_RegisterTSS(TechName, msg)
@@ -1392,8 +1401,6 @@ function StatsUI_RegisterTSS(TechName, msg)
 	--print("- Current value: " .. tostring(STATS_TeamSpecificStats[TechName][msg.steamId]))
 end
 
-
-
 local STATS_PresGraph = {}
 function STATSUI_PresGraphAliens(presUnused, presEquipped, rtAmount, playerCount)
 	table.insert(
@@ -1402,8 +1409,8 @@ function STATSUI_PresGraphAliens(presUnused, presEquipped, rtAmount, playerCount
 			presUnused = presUnused,
 			rtAmount = rtAmount,
 			presEquipped = presEquipped,
-			gameMinute = GetGameTime(true), 
-			playerCount = playerCount, -- doesnt count the commander
+			gameMinute = GetGameTime(true),
+			playerCount = playerCount -- doesnt count the commander
 		}
 	)
 end
@@ -1414,8 +1421,8 @@ function STATSUI_PresGraphMarines(presUnused, presEquipped, rtAmount, playerCoun
 			presUnused = presUnused,
 			rtAmount = rtAmount,
 			presEquipped = presEquipped,
-			gameMinute = GetGameTime(true), 
-			playerCount = playerCount, -- doesnt count the commander
+			gameMinute = GetGameTime(true),
+			playerCount = playerCount -- doesnt count the commander
 		}
 	)
 end
