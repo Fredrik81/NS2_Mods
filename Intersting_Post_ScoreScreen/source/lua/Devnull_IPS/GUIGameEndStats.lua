@@ -2293,6 +2293,9 @@ function GUIGameEndStats:Initialize()
     self.rtGraphTextShadow:SetLayer(kGUILayerMainMenu)
     self.background:AddChild(self.rtGraphTextShadow)
 
+
+    -- commented out for LessNetworkData
+    --[[
     self.presGraphTextShadow = GUIManager:CreateTextItem()
     self.presGraphTextShadow:SetStencilFunc(GUIItem.NotEqual)
     self.presGraphTextShadow:SetFontName(kTitleFontName)
@@ -2319,6 +2322,7 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
     self.presGraphText:SetLayer(kGUILayerMainMenu)
     self.presGraphTextShadow:AddChild(self.presGraphText)
+    ]]
 
     self.rtGraphText = GUIManager:CreateTextItem()
     self.rtGraphText:SetStencilFunc(GUIItem.NotEqual)
@@ -2430,6 +2434,8 @@ function GUIGameEndStats:Initialize()
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
 
+    -- commented out for LessNetworkData
+    --[[
     self.presGraph = {}
     self.presGraph = LineGraph()
     self.presGraph:Initialize()
@@ -2455,6 +2461,8 @@ function GUIGameEndStats:Initialize()
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
+
+    ]]
 
     self.builtRTsComp = ComparisonBarGraph()
     self.builtRTsComp:Initialize()
@@ -2713,6 +2721,8 @@ function GUIGameEndStats:RepositionStats()
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
 
+    -- commented out for LessNetworkData
+    --[[
     local showpresGraph = self.presGraphs and #self.presGraphs > 0 or false
     self.presGraphTextShadow:SetIsVisible(showpresGraph)
     self.presGraph:SetIsVisible(showpresGraph)
@@ -2723,6 +2733,7 @@ function GUIGameEndStats:RepositionStats()
         self.presGraph:SetPosition(Vector((kTitleSize.x - rtGraphSize.x) / 2, yPos, 0))
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
+    ]]
 
     self.contentSize = math.max(self.contentSize, yPos)
 end
@@ -4567,6 +4578,11 @@ function GUIGameEndStats:ProcessStats()
 		end
 	end
 	]]
+
+
+    -- commented out for LessNetworkData
+    --[[
+
     local function getPresGraphPoints(teamNumber, presTable, graphCeiling, equippedGraph, totalGraph)
         table.sort(
             presTable,
@@ -4655,6 +4671,8 @@ function GUIGameEndStats:ProcessStats()
         self.presGraph:SetXGridSpacing(xSpacing)
     end
 
+    ]]
+
     self:RepositionStats()
 
     pcall(self.SaveLastRoundStats, self)
@@ -4679,8 +4697,9 @@ function GUIGameEndStats:ProcessStats()
     DIPS_MarineCommID = nil
     DIPS_EnahncedStats = false
 
-    presGraphTableAliens = {}
-    presGraphTableMarines = {}
+    -- commented out for LessNetworkData
+    -- presGraphTableAliens = {}
+    -- presGraphTableMarines = {}
 end
 
 function GUIGameEndStats:Update()
@@ -5306,6 +5325,10 @@ Client.HookNetworkMessage("BuildingSummary", CHUDSetBuildingSummary)
 Client.HookNetworkMessage("EalStats", CHUDEquipmentAndLifeformsLog)
 Client.HookNetworkMessage("TeamSpecificStats", CHUDTeamSpecificStatsLog)
 
+
+-- commented out for LessNetworkData
+--[[
+
 local function CHUDPresGraphAliens(message)
     if message and message.gameMinute then
         table.insert(presGraphTableAliens, message)
@@ -5322,3 +5345,5 @@ local function CHUDPresGraphMarines(message)
     lastStatsMsg = Shared.GetTime()
 end
 Client.HookNetworkMessage("PresGraphStatsMarines", CHUDPresGraphMarines)
+
+]]

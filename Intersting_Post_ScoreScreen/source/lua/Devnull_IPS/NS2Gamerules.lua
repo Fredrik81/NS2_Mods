@@ -1,3 +1,6 @@
+-- complete file is commented out at the Filehooks due for LessNetworkData
+
+
 if Server then
 
     local kUpdateGraphInterval = kResourceTowerResourceInterval --collect pres amount data every 6 seconds,

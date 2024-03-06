@@ -1080,13 +1080,16 @@ function StatsUI_SendTeamStats()
 		Server.SendNetworkMessage("BuildingSummary", buildMsg, true)
 	end
 
-	for _, entry in ipairs(STATS_PresGraphMarines) do
+	--currently unused because of LessNetworkData
+	--[[
+		for _, entry in ipairs(STATS_PresGraphMarines) do
 		Server.SendNetworkMessage("PresGraphStatsMarines", entry, true)
 	end
 
 	for _, entry in ipairs(STATS_PresGraphAliens) do
 		Server.SendNetworkMessage("PresGraphStatsAliens", entry, true)
 	end
+	]]
 end
 
 local function GetServerMods()

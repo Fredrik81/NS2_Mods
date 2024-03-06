@@ -30,7 +30,9 @@ end
 if Client then
     ModLoader.SetupFileHook("lua/GUIDeathStats.lua", "lua/Devnull_IPS/GUIDeathStats.lua", "post")
 end
-ModLoader.SetupFileHook("lua/GUIGameEndStats.lua", "lua/Devnull_IPS/GUIGameEndStats.lua", "replace")
 ModLoader.SetupFileHook("lua/ServerStats.lua", "lua/Devnull_IPS/ServerStats.lua", "replace")
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/Devnull_IPS/NetworkMessages.lua", "post")
+
+-- pres calculations for pres graph, commented out for LessNetworkData
+--ModLoader.SetupFileHook("lua/GUIGameEndStats.lua", "lua/Devnull_IPS/GUIGameEndStats.lua", "replace")
 
