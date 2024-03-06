@@ -1037,10 +1037,10 @@ function StatsUI_SendTeamStats()
 	end
 
 	--Send all EQ and Lifeforms
-	print("Send EALStats: " .. dump(EaL_Data))
-	print("Type: " .. type(EaL_Data))
+	--print("Send EALStats: " .. dump(EaL_Data))
+	--print("Type: " .. type(EaL_Data))
 	for _, entry in pairs(EaL_Data) do
-		print("Sending entry: " .. dump(entry))
+		--print("Sending entry: " .. dump(entry))
 		Server.SendNetworkMessage("EalStats", entry, true)
 	end
 
