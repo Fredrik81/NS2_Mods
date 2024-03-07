@@ -60,7 +60,8 @@ Shared.RegisterNetworkMessage("DeathStats", kDeathStatsMessage)
 
 
 
-
+--currently unused because of LessNetworkData
+--[[
 local kPresGraphStatsMarines = {
     presUnused = "float (0 to 3200 by 0.1)",
     rtAmount = "integer (0 to 32)",
@@ -69,7 +70,6 @@ local kPresGraphStatsMarines = {
     playerCount = "integer (0 to 32)"
 }
 Shared.RegisterNetworkMessage("PresGraphStatsMarines", kPresGraphStatsMarines)
-
 local kPresGraphStatsAliens = {
     presUnused = "float (0 to 3200 by 0.1)",
     rtAmount = "integer (0 to 32)",
@@ -79,6 +79,7 @@ local kPresGraphStatsAliens = {
 }
 Shared.RegisterNetworkMessage("PresGraphStatsAliens", kPresGraphStatsAliens)
 
+]]
 
 
 

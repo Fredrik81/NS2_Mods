@@ -24,7 +24,8 @@ if Server then
     ModLoader.SetupFileHook("lua/LiveMixin.lua", "lua/Devnull_IPS/LiveMixin.lua", "post")
     ModLoader.SetupFileHook("lua/MedPack.lua", "lua/Devnull_IPS/MedPack.lua", "post")
 
-    ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/Devnull_IPS/NS2Gamerules.lua", "post")
+    -- pres calculations for pres graph, commented out for LessNetworkData
+    --ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/Devnull_IPS/NS2Gamerules.lua", "post")
 end
 
 if Client then
@@ -33,4 +34,3 @@ end
 ModLoader.SetupFileHook("lua/GUIGameEndStats.lua", "lua/Devnull_IPS/GUIGameEndStats.lua", "replace")
 ModLoader.SetupFileHook("lua/ServerStats.lua", "lua/Devnull_IPS/ServerStats.lua", "replace")
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/Devnull_IPS/NetworkMessages.lua", "post")
-
