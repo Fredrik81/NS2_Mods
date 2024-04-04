@@ -61,14 +61,13 @@ Client.HookNetworkMessage(Plugin.kMsgPermName, Plugin.RecESB_Perm)
 
 function Plugin.RecESB_Data(message)
 	local values = Plugin.Split(message.p, ",")
-	if (#values == 5) then -- Sanity check
+	--print("DumpRec: " .. dump(values))
+	if (#values == 4) then -- Sanity check
 		local data = {}
 		data.steamId = tonumber(values[1])
-		data.playedTime = tonumber(values[2])
-		data.commanderTime = tonumber(values[3])
-		data.country = values[4]
-		data.region = values[5]
-
+		data.isAdmin = (values[2] == "true")
+		data.country = values[3]
+		data.proxy = (values[4] == "true")
 		--Validate steamId
 		if data.steamId and data.steamId > 0 then
 			Plugin.PlayerData[data.steamId] = data
@@ -121,12 +120,12 @@ function Plugin.GetPlayerSkillNextSkill(skill)
 	end
 end
 
-local admins = {19849485, 89160056, 77470693} -- Test
+local admins = {74660439}
 function Plugin.isAdmin()
 	local playerData = Plugin.PlayerData[tostring(Client.GetLocalClientIndex())]
-	local isAdmin = playerData and playerData.isAdmin or 0
+	local isAdmin = playerData and playerData.isAdmin or false
 
-	return (isAdmin > 0) or table.contains(admins, Client.GetSteamId()) -- Whether to display tier info stats -- string.find(Plugin.perm, "sh_tierinfo")
+	return (isAdmin == true) or table.contains(admins, Client.GetSteamId()) -- Whether to display tier info stats -- string.find(Plugin.perm, "sh_tierinfo")
 end
 
 function Plugin:Initialise()
@@ -265,10 +264,15 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 
 						--Add extended info if exist..
 						if Plugin.PlayerData[steamId] then
-							--description = description .. string.format("\n\nGametime: %s hours", Plugin.PlayerData[steamId].playedTime)
-							--description = description .. string.format("\nCommanding: %s hours", Plugin.PlayerData[steamId].commanderTime)
 							description = description .. string.format("\n\nCountry: %s", Plugin.PlayerData[steamId].country)
-							--description = description .. string.format("\nRegion: %s", Plugin.PlayerData[steamId].region)
+							--Add logic for only showing to select shine role
+							if Plugin.isAdmin() and Plugin.PlayerData[steamId].proxy then
+								description = description .. string.format("\nVPN Detected!")
+							end
+
+							if Plugin.dt.EnableShowAdmin and Plugin.PlayerData[steamId].isAdmin then
+								description = string.format("! Server Admin !\n\n") .. description
+							end
 						end
 
 						if isSpectator then
@@ -284,10 +288,10 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 			end
 		end
 		if isSpectator and Plugin.dt.EnableQueueInfo then
-				local queueIndex = Plugin.QueueIndex[tostring(clientIndex)]
-				if (queueIndex) then
-					player.Status:SetText(string.format("Queue: %i", queueIndex))
-				end
+			local queueIndex = Plugin.QueueIndex[tostring(clientIndex)]
+			if (queueIndex) then
+				player.Status:SetText(string.format("Queue: %i", queueIndex))
+			end
 		end
 		currentPlayerIndex = currentPlayerIndex + 1
 	end
@@ -305,11 +309,9 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 
 			teamHeaderText = teamHeaderText .. string.format(", %i Avg Skill", avgSkill) -- Skill Average
 
-			--if (Plugin:isAdmin()) then
-				if (Plugin.dt.EnableTeamTotalSkill) then
-					teamHeaderText = teamHeaderText .. string.format(", %s Total Skill", humanNumber(totalSkill)) -- SPH Average
-				end
-			--end
+			if (Plugin.dt.EnableTeamTotalSkill) then
+				teamHeaderText = teamHeaderText .. string.format(", %s Total Skill", humanNumber(totalSkill)) -- SPH Average
+			end
 
 			teamHeaderText = teamHeaderText .. ")"
 			--
