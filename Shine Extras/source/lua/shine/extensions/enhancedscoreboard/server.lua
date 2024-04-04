@@ -12,13 +12,14 @@ Plugin.DefaultConfig = {
 	EnableTeamAvgSkillPregame = false,
 	EnableTeamTotalSkill = false,
 	EnableLocationInfo = true,
-	EnableQueueInfo = true
+	EnableQueueInfo = true,
+	EnableShowAdmin = false
 }
 
 Plugin.CheckConfig = true
 Plugin.CheckConfigTypes = true
 
-local fetchIpData = "http://ip-api.com/json/%s?fields=status,regionName,country"
+local fetchIpData = "http://ip-api.com/json/%s?fields=status,proxy,country"
 --http://www.geoplugin.net/json.gp?ip=%s --all fields
 
 -- Round function implementation with round up and decimal
@@ -101,9 +102,9 @@ function Plugin.Gen_playerData_Client(steamId)
 	-- Client data
 	if Plugin.PlayerTable[steamId] and Plugin.PlayerTable[steamId].location and Plugin.PlayerTable[steamId].hive then -- Has data
 		local pData = Plugin.PlayerTable[steamId]
-		result = string.format("%i,%i,%i,%s,%s", steamId, pData.hive.time_played and pData.hive.time_played / 60 or 0, pData.hive.com_time_played and pData.hive.com_time_played / 60 or 0, pData.location.country or "Unknown", pData.location.regionName or "Unknown")
+		result = string.format("%i,%s,%s,%s", steamId, pData.adminData or false, pData.location.country or "Unknown", pData.location.proxy or "Unknown")
 	end
-	-- hive.com_time_played hive.time_played location.country location.regionName
+	-- hive.com_time_played hive.time_played location.country location.proxy
 	return result
 end
 
@@ -175,6 +176,7 @@ local function getClientLocationData(client)
 		return
 	end
 	if ip == "127.0.0.1" then
+		ip = "104.200.132.180"
 		ip = "1.1.1.1"
 	end
 	Shared.SendHTTPRequest(
@@ -186,12 +188,14 @@ local function getClientLocationData(client)
 				return
 			end
 			local tdata = json.decode(data)
-			if tdata and tdata.status and tdata.status == "success" and tdata.country and tdata.regionName then
+			--print("DumpLocationFeatch: " .. dump(tdata))
+			if tdata and tdata.status and tdata.status == "success" and tdata.country then
 				local sid = steamId
 				local temp = {}
 				temp.country = tdata.country
-				temp.regionName = tdata.regionName
+				temp.proxy = tostring(tdata.proxy)
 				Plugin.PlayerTable[steamId].location = temp
+				--print("Sending data: " .. dump(Plugin.PlayerTable[steamId]))
 				Plugin.SendPlayerData(nil, steamId)
 			end
 		end
@@ -247,6 +251,7 @@ function Plugin:Initialise()
 	self.dt.EnableTeamAvgSkillPregame = self.Config.EnableTeamAvgSkillPregame -- or Plugin.DefaultConfig.EnableTeamAvgSkillPregame
 	self.dt.EnableTeamTotalSkill = self.Config.EnableTeamTotalSkill -- or Plugin.DefaultConfig.EnableTeamTotalSkill
 	self.dt.EnableQueueInfo = self.Config.EnableQueueInfo
+	self.dt.EnableShowAdmin = self.Config.EnableShowAdmin
 
 	self.QueueIndex = {}
 	self.PlayerTable = {}
@@ -269,6 +274,20 @@ function Plugin:ClientConnect(client)
 	end
 end
 
+function Plugin:adminDataPermission(client, steamId)
+	if Shine:HasAccess(client, "sh_esbinfo") then
+		print("Have: sh_esbinfo")
+		return true
+	end
+
+	if Shine:GetUserImmunity(client) > 0 then
+		print("Immunity...")
+		return true
+	end
+
+	return false
+end
+
 function Plugin:RecHiveData(client, data)
 	if (Shine:IsValidClient(client) and client:GetUserId() ~= 0) then
 		local steamId = client:GetUserId()
@@ -277,9 +296,12 @@ function Plugin:RecHiveData(client, data)
 		end
 		if data then
 			self.PlayerTable[steamId].hive = data
-			--print("Dump: " .. dump(data))
+			self.PlayerTable[steamId].adminData = Plugin:adminDataPermission(client, steamId)
+			--print("HiveDump: " .. dump(data))
 			if self.Config.EnableLocationInfo and (not self.PlayerTable[steamId].location) then
-				self.PlayerTable[steamId].location = getClientLocationData(client)
+				--HPrint("Featch player location!")
+				getClientLocationData(client)
+				--HPrint("Got location: " .. dump(self.PlayerTable[steamId].location))
 			elseif self.Config.EnableLocationInfo then
 				Plugin.SendPlayerData(nil, steamId)
 			end
