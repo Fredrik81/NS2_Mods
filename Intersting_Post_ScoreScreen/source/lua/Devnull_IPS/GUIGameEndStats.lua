@@ -3183,17 +3183,20 @@ function GUIGameEndStats:BuildTopPlayersGraph()
                 end
             )
             TopSDmgPlayer = playerData[1].playerData
+            local rtAmount = 0
             if TopSDmgPlayer.isMarine then
                 topScoreLogoTexture = kMarineStatsLogo
+                rtAmount = roundNumber(playerData[1].Value / (kExtractorHealth + kExtractorArmor), 1)
             else
                 topScoreLogoTexture = kAlienStatsLogo
+                rtAmount = roundNumber(playerData[1].Value / (kHarvesterHealth + kHarvesterArmor), 1)
             end
             local TopSDmgPlayerCard = self:CreateGraphicHeader("Top Resource Tower", bgColor, topScoreLogoTexture, Vector(10, 10, 0), kLogoSize.x, kLogoSize.y)
             TopSDmgPlayerCard.rows = {}
             TopSDmgPlayerCard.teamNumber = -2
             TopSDmgPlayerCard.backgroundRight:SetTexturePixelCoordinates(GUIUnpackCoords(kHeaderCoordsRight))
             TopSDmgPlayerCard.background:SetPosition(Vector(kTitleSize.x - kCardSize.x - GUILinearScale(32), kBackgroundSize.y + GUILinearScale(16), 0))
-            table.insert(TopSDmgPlayerCard.rows, CreateTopPlayerSmallRow(TopSDmgPlayerCard.tableBackground, kAverageRowColor, Color(1, 1, 1, 1), TopSDmgPlayer, "RT Damage", humanNumber(roundNumber(playerData[1].Value, 0))))
+            table.insert(TopSDmgPlayerCard.rows, CreateTopPlayerSmallRow(TopSDmgPlayerCard.tableBackground, kAverageRowColor, Color(1, 1, 1, 1), TopSDmgPlayer, "RT Damage", humanNumber(roundNumber(playerData[1].Value, 0)) .. " (" .. rtAmount .. " RTs)"))
             self.topPlayersCards.sdmg = TopSDmgPlayerCard
         else
             TopSDmgPlayer = finalStatsTable[tblIndexSortSubValue(finalStatsTable, "sdmg")]
