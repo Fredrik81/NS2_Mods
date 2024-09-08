@@ -1108,7 +1108,13 @@ local function CreateTssItem(container, dataTable, decimals, Label, Icon, IconVe
         if dataText ~= "" then
             dataText = dataText .. string.char(10)
         end
-        dataText = dataText .. "(" .. tostring(humanNumber(tData.Value)) .. ") " .. tData.playerName
+        if Label == "Node Clearer" then
+            dataText = dataText .. "(" .. tostring(humanNumber(tData.Value)) .. "/" .. roundNumber(tData.Value / (kHarvesterHealth + kHarvesterArmor), 1) .. "RTs) " .. tData.playerName
+        elseif Label == "Resource Eater" then
+                dataText = dataText .. "(" .. tostring(humanNumber(tData.Value)) .. "/" .. roundNumber(tData.Value / (kExtractorHealth + kExtractorArmor), 1) .. "RTs) " .. tData.playerName
+        else
+            dataText = dataText .. "(" .. tostring(humanNumber(tData.Value)) .. ") " .. tData.playerName
+        end
         i = i + 1
     end
     item.labelText.tooltip = item.labelText.tooltip .. "\n" .. dataText
