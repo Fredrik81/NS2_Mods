@@ -325,6 +325,7 @@ function StatsUI_ResetLastLifeStats(steamId)
 		STATS_ClientStats[steamId]["last"].marineRtDamage = 0
 		STATS_ClientStats[steamId]["last"].alienRtDamage = 0
 		STATS_ClientStats[steamId]["last"].aliveFor = Shared.GetTime()
+		STATS_ClientStats[steamId]["last"].mapCheck = 0
 	end
 end
 
@@ -349,6 +350,7 @@ function StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
 				entry.timeBuilding = 0
 				entry.timePlayed = 0
 				entry.commanderTime = 0
+				entry.timeMapCheck = 0
 			end
 
 			-- These are team independent
@@ -535,6 +537,31 @@ function StatsUI_AddBuildTime(steamId, buildTime, teamNumber)
 		end
 	end
 end
+
+function StatsUI_AddMapCheckTime(client, message)
+	--print("Received mapCheckTime " .. tostring(type(client)) .. " "..ToString(client) .. " " .. tostring(client.classname) .. " / time " .. tostring(message.mapCheckTime) .. " team no " .. tostring(message.teamNumber))
+	local player = client:GetControllingPlayer()
+	local steamId = 0
+	if player then
+		steamId = player:GetSteamId()
+	end
+	if steamId > 0 and GetGamerules():GetGameStarted()  and (message.teamNumber == 1 or message.teamNumber == 2) then
+		StatsUI_MaybeInitClientStats(steamId, nil, message.teamNumber)
+		
+		local mapCheckTimeValidated = message.mapCheckTime
+		if GetGameTime() < mapCheckTimeValidated then
+			--print("Time had to be validated " .. tostring(GetGameTime()) .. " vs " .. tostring(mapCheckTimeValidated))
+			mapCheckTimeValidated = GetGameTime()
+		end
+		if STATS_ClientStats[steamId] then
+			local stat = STATS_ClientStats[steamId][message.teamNumber]
+			--print("Adding time " .. tostring(stat.timeMapCheck) .. " + " .. tostring(message.mapCheckTime) ..  " = " .. tostring(stat.timeMapCheck + mapCheckTimeValidated))
+			stat.timeMapCheck = stat.timeMapCheck + mapCheckTimeValidated
+		end
+	end
+end
+
+Server.HookNetworkMessage("mapCheckTime", StatsUI_AddMapCheckTime)
 
 local classNameToTechId = {}
 classNameToTechId["SporeCloud"] = kTechId.Spores
@@ -847,6 +874,7 @@ function StatsUI_FormatRoundStats()
 				statEntry.pdmg = entry.pdmg
 				statEntry.sdmg = entry.sdmg
 				statEntry.minutesBuilding = entry.timeBuilding / 60
+				statEntry.minutesMapCheck = entry.timeMapCheck / 60
 				statEntry.minutesPlaying = entry.timePlayed / 60
 				statEntry.minutesComm = entry.commanderTime / 60
 				statEntry.isRookie = entry.isRookie
@@ -1301,6 +1329,7 @@ function StatsUI_HandlePreOnKill(self, killer, doer, point, direction)
 					msg.marineRtDamage = lastStat.marineRtDamage
 					msg.alienRtDamage = lastStat.alienRtDamage
 					msg.aliveFor = roundNumber((Shared.GetTime() - lastStat.aliveFor) / 60, 2)
+					msg.mapCheck = lastStat.mapCheck
 					--print("Current time: " .. tostring(Shared.GetTime()))
 					--print("born time: " .. tostring(lastStat.aliveFor))
 					--print("Dump LastStats: " .. dump(msg))

@@ -34,3 +34,6 @@ end
 ModLoader.SetupFileHook("lua/GUIGameEndStats.lua", "lua/Devnull_IPS/GUIGameEndStats.lua", "replace")
 ModLoader.SetupFileHook("lua/ServerStats.lua", "lua/Devnull_IPS/ServerStats.lua", "replace")
 ModLoader.SetupFileHook("lua/NetworkMessages.lua", "lua/Devnull_IPS/NetworkMessages.lua", "post")
+ModLoader.SetupFileHook("lua/GUIMinimapFrame.lua", "lua/Devnull_IPS/GUIMinimapFrame.lua", "post")
+ModLoader.SetupFileHook("lua/GUIMinimap.lua", "lua/Devnull_IPS/GUIMinimap.lua", "post")
+
