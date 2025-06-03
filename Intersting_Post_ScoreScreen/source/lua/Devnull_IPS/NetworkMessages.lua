@@ -21,6 +21,7 @@ local kPlayerStatsMessage = {
     sdmg = "float (0 to 524287 by 0.01)",
     minutesBuilding = "float (0 to 1023 by 0.01)",
     minutesPlaying = "float (0 to 1023 by 0.01)",
+    minutesMapCheck = "float (0 to 1023 by 0.01)",
     minutesComm = "float (0 to 1023 by 0.01)",
     killstreak = "integer (0 to 254)",
     steamId = "integer",
@@ -53,10 +54,16 @@ local kDeathStatsMessage = {
     medsReceived = "integer",
     marineRtDamage = "float (0 to 524287 by 0.01)",
     alienRtDamage = "float (0 to 524287 by 0.01)",
-    aliveFor = "float (0 to 524287 by 0.01)"
+    aliveFor = "float (0 to 524287 by 0.01)", 
+    mapCheck = "float (0 to 524287 by 0.01)"
 }
 Shared.RegisterNetworkMessage("DeathStats", kDeathStatsMessage)
 
+local kMapCheckMessage = {
+    teamNumber = "integer (1 to 2)",
+    mapCheckTime = "float (0 to 524287 by 0.01)"
+}
+Shared.RegisterNetworkMessage("mapCheckTime", kMapCheckMessage)
 
 
 

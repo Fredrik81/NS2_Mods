@@ -516,7 +516,7 @@ function GUIGameEndStats:CreateTeamBackground(teamNumber)
 end
 
 local function CreateScoreboardRow(container, bgColor, textColor, playerName, kills, assists, deaths, acc, score, pdmg,
-    sdmg, timeBuilding, timePlayed, timeComm, steamId, isRookie, hiveSkill)
+    sdmg, timeBuilding, timeMapCheck, timePlayed, timeComm, steamId, isRookie, hiveSkill)
     local containerSize = container:GetSize()
     container:SetSize(Vector(containerSize.x, containerSize.y + kRowSize.y, 0))
 
@@ -632,6 +632,22 @@ local function CreateScoreboardRow(container, bgColor, textColor, playerName, ki
     item.background:AddChild(item.timePlayed)
 
     xOffset = xOffset - kItemSize - kItemPaddingExtraSmall
+
+    item.timeMapCheck = GUIManager:CreateTextItem()
+    item.timeMapCheck:SetStencilFunc(GUIItem.NotEqual)
+    item.timeMapCheck:SetFontName(kRowFontName)
+    item.timeMapCheck:SetColor(textColor)
+    item.timeMapCheck:SetScale(scaledVector)
+    GUIMakeFontScale(item.timeMapCheck)
+    item.timeMapCheck:SetAnchor(GUIItem.Left, GUIItem.Center)
+    item.timeMapCheck:SetTextAlignmentY(GUIItem.Align_Center)
+    item.timeMapCheck:SetTextAlignmentX(GUIItem.Align_Max)
+    item.timeMapCheck:SetPosition(Vector(xOffset, 0, 0))
+    item.timeMapCheck:SetText(timeMapCheck or "")
+    item.timeMapCheck:SetLayer(kGUILayerMainMenu)
+    item.background:AddChild(item.timeMapCheck)
+
+    xOffset = xOffset - kItemSize - kItemPaddingSmallMedium
 
     item.timeBuilding = GUIManager:CreateTextItem()
     item.timeBuilding:SetStencilFunc(GUIItem.NotEqual)
@@ -2074,12 +2090,12 @@ function GUIGameEndStats:Initialize()
     table.insert(self.team1UI.playerRows,
         CreateScoreboardRow(self.team1UI.tableBackground, kHeaderRowColor, kMarineHeaderRowTextColor, "Player name",
             "K", "A", "D", ConditionalValue(avgAccTable.marineOnosAcc == -1, "Accuracy", "Acc. (No Onos)"), "Score",
-            "Pl. dmg", "Str. dmg", "Build time", "Played"))
+            "Pl. dmg", "Str. dmg", "Build time", "Map time", "Played"))
     self.team2UI = self:CreateTeamBackground(2)
     self.team2UI.playerRows = {}
     table.insert(self.team2UI.playerRows,
         CreateScoreboardRow(self.team2UI.tableBackground, kHeaderRowColor, kAlienHeaderRowTextColor, "Player name", "K",
-            "A", "D", "Accuracy", "Score", "Pl. dmg", "Str. dmg", "Build time", "Played"))
+            "A", "D", "Accuracy", "Score", "Pl. dmg", "Str. dmg", "Build time", "Map time", "Played"))
 
     self.sliderBarBg = GUIManager:CreateGraphicItem()
     self.sliderBarBg:SetColor(Color(0, 0, 0, 0.5))
@@ -4067,6 +4083,7 @@ function GUIGameEndStats:ProcessStats()
         message.sdmg = message.sdmg or 0
         message.minutesBuilding = message.minutesBuilding or 0
         message.minutesPlaying = message.minutesPlaying or 0
+        message.minutesMapCheck = message.minutesMapCheck or 0
         message.minutesComm = message.minutesComm or 0
         message.killstreak = message.killstreak or 0
         message.steamId = message.steamId or 1
@@ -4088,6 +4105,9 @@ function GUIGameEndStats:ProcessStats()
         local pMinutes = math.floor(message.minutesPlaying)
         local pSeconds = (message.minutesPlaying % 1) * 60
 
+        local mcMinutes = math.floor(message.minutesMapCheck)
+        local mcSeconds = (message.minutesMapCheck % 1) * 60
+		
         local cMinutes = math.floor(message.minutesComm)
         local cSeconds = (message.minutesComm % 1) * 60
 
@@ -4136,7 +4156,7 @@ function GUIGameEndStats:ProcessStats()
             message.accuracyOnos == -1 and string.format("%s%%", round(message.accuracy, 0)) or
                 string.format("%s%% (%s%%)", round(message.accuracy, 0), round(message.accuracyOnos, 0)),
             round(message.score, 0), humanNumber(roundNumber(message.pdmg, 0)),
-            humanNumber(roundNumber(message.sdmg, 0)), string.format("%d:%02d", minutes, seconds),
+            humanNumber(roundNumber(message.sdmg, 0)), string.format("%d:%02d", minutes, seconds), string.format("%d:%02d", mcMinutes, mcSeconds),
             string.format("%d:%02d", pMinutes, pSeconds), message.minutesComm > 0 and
                 string.format("%d:%02d", cMinutes, cSeconds) or nil, message.steamId, message.isRookie,
             message.hiveSkill)
