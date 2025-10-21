@@ -10,9 +10,6 @@
 -- ========= For more information, visit us at http://www.unknownworlds.com =====================
 class "GUIGameEndStats"(GUIScript)
 
-local zlib = require("zlib")
-local json = require("json")
-
 Script.Load("lua/graphs/LineGraph.lua")
 Script.Load("lua/graphs/ComparisonBarGraph.lua")
 Script.Load("lua/NS2Utility.lua")
@@ -113,18 +110,6 @@ local printNum1 = function(number)
 end
 local printNum2 = function(number)
     return printNumWithDecimals(number, 2)
-end
-
-function CompressTable(tbl)
-    local jsonData = json.encode(tbl)
-    local deflater = zlib.deflate()
-    return deflater(jsonData, "finish")
-end
-
-function DecompressToTable(data)
-    local inflater = zlib.inflate()
-    local jsonData = inflater(data, "finish")
-    return json.decode(jsonData)
 end
 
 local function dump(o)
