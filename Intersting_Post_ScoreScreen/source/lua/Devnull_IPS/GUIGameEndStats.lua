@@ -2959,6 +2959,8 @@ function GUIGameEndStats:UpdateRowHighlight()
             highlightedField = "minutesPlaying"
         elseif highlightedField == "playerName" then
             highlightedField = "lowerCaseName"
+        elseif highlightedField == "timeMapCheck" then
+            highlightedField = "minutesMapCheck"
         end
     end
 end
@@ -4092,7 +4094,7 @@ function GUIGameEndStats:ProcessStats()
 
         local mcMinutes = math.floor(message.minutesMapCheck)
         local mcSeconds = (message.minutesMapCheck % 1) * 60
-		
+
         local cMinutes = math.floor(message.minutesComm)
         local cSeconds = (message.minutesComm % 1) * 60
 
@@ -4221,29 +4223,29 @@ function GUIGameEndStats:ProcessStats()
         table.insert(self.team1UI.playerRows,
             CreateScoreboardRow(self.team1UI.tableBackground, kHeaderRowColor, kMarineHeaderRowTextColor, "Total",
                 printNum(totalKills1), printNum(totalAssists1), printNum(totalDeaths1), " ", round(team1Score, 0),
-                round(totalPdmg1, 0), round(totalSdmg1, 0), string.format("%d:%02d", minutes1, seconds1)))
+                humanNumber(totalPdmg1), humanNumber(totalSdmg1), string.format("%d:%02d", minutes1, seconds1)))
         table.insert(self.team1UI.playerRows,
             CreateScoreboardRow(self.team1UI.tableBackground, kAverageRowColor, kAverageRowTextColor, "Average",
                 round(totalKills1 / numPlayers1, 0), round(totalAssists1 / numPlayers1, 0),
                 round(totalDeaths1 / numPlayers1, 0),
                 avgAccuracy1Onos == -1 and string.format("%s%%", round(avgAccuracy1, 0)) or
                     string.format("%s%% (%s%%)", round(avgAccuracy1, 0), round(avgAccuracy1Onos, 0)),
-                round(team1Score / numPlayers1, 0), round(totalPdmg1 / numPlayers1, 0),
-                round(totalSdmg1 / numPlayers1, 0), string.format("%d:%02d", minutes1Avg, seconds1Avg),
-                string.format("%d:%02d", minutes1PAvg, seconds1PAvg)))
+                round(team1Score / numPlayers1, 0), humanNumber(totalPdmg1 / numPlayers1),
+                humanNumber(totalSdmg1 / numPlayers1), string.format("%d:%02d", minutes1Avg, seconds1Avg),
+                " ", string.format("%d:%02d", minutes1PAvg, seconds1PAvg)))
     end
     if numPlayers2 > 1 then
         table.insert(self.team2UI.playerRows,
             CreateScoreboardRow(self.team2UI.tableBackground, kHeaderRowColor, kAlienHeaderRowTextColor, "Total",
                 printNum(totalKills2), printNum(totalAssists2), printNum(totalDeaths2), " ", round(team2Score, 0),
-                round(totalPdmg2, 0), round(totalSdmg2, 0), string.format("%d:%02d", minutes2, seconds2)))
+                humanNumber(totalPdmg2), humanNumber(totalSdmg2), string.format("%d:%02d", minutes2, seconds2)))
         table.insert(self.team2UI.playerRows,
             CreateScoreboardRow(self.team2UI.tableBackground, kAverageRowColor, kAverageRowTextColor, "Average",
                 round(totalKills2 / numPlayers2, 0), round(totalAssists2 / numPlayers2, 0),
                 round(totalDeaths2 / numPlayers2, 0), string.format("%s%%", round(avgAccuracy2, 0)),
-                round(team2Score / numPlayers2, 0), round(totalPdmg2 / numPlayers2, 0),
-                round(totalSdmg2 / numPlayers2, 0), string.format("%d:%02d", minutes2Avg, seconds2Avg),
-                string.format("%d:%02d", minutes2PAvg, seconds2PAvg)))
+                round(team2Score / numPlayers2, 0), humanNumber(totalPdmg2 / numPlayers2),
+                humanNumber(totalSdmg2 / numPlayers2), string.format("%d:%02d", minutes2Avg, seconds2Avg),
+                " ", string.format("%d:%02d", minutes2PAvg, seconds2PAvg)))
     end
 
     local gameInfo = GetGameInfoEntity()
@@ -5436,6 +5438,9 @@ function GUIGameEndStats:SendKeyEvent(key, down)
                 not GUIItemContainsPoint(self.hoverMenu.background, mouseX, mouseY) then
                 self.hoverMenu:Hide()
             end
+
+            print("Checking for column header clicks")
+            print("Field: " ..tostring(highlightedField))
 
             if highlightedField ~= nil then
                 if highlightedFieldMarine then

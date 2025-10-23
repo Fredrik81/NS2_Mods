@@ -1,5 +1,5 @@
-local kVersion = "1.8.8"
-local kName = "Devnull - Enhanced ScoreBoard"
+local kVersion = "1.9.0"
+local kName = "Devnull - Enhanced Scoreboard"
 
 if Client then
     HPrint(kName .. ", version " .. kVersion)

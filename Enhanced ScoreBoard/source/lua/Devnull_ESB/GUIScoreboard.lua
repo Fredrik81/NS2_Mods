@@ -39,6 +39,7 @@ GUIScoreboard.kTeamSmallBoldFont = ReadOnly {family = "Arial", size = 11}
 GUIScoreboard.kTeamLargeFont = ReadOnly {family = "Arial", size = 12}
 GUIScoreboard.kTeamLargeBoldFont = ReadOnly {family = "Arial", size = 13}
 GUIScoreboard.kPlayerStatsFontName = Fonts.kArial_15
+GUIScoreboard.kPlayerStatsFontNameBold = Fonts.kInsight
 --GUIScoreboard.kPlayerStatsFontName = Fonts.kInsight
 GUIScoreboard.kTeamNameFontName = Fonts.kArial_17
 --GUIScoreboard.kTeamNameFontName = Fonts.kInsight
@@ -57,10 +58,12 @@ GUIScoreboard.kHighPingColor = Color(1, 0.5, 0, 1)
 GUIScoreboard.kInsanePingColor = Color(1, 0, 0, 1)
 GUIScoreboard.kVoiceMuteColor = Color(1, 1, 1, 1)
 GUIScoreboard.kVoiceDefaultColor = Color(1, 1, 1, 0.5)
-GUIScoreboard.kHighPresThreshold = 75
+GUIScoreboard.kHighPresThreshold = 55
 GUIScoreboard.kHighPresColor = Color(1, 1, 0, 1)
-GUIScoreboard.kVeryHighPresThreshold = 90
+GUIScoreboard.kVeryHighPresThreshold = 75
 GUIScoreboard.kVeryHighPresColor = Color(1, 0.5, 0, 1)
+GUIScoreboard.kMaxPresThreshold = 100
+GUIScoreboard.kMaxPresColor = Color(1, 0, 0, 1)
 
 -- Team constants.
 GUIScoreboard.kTeamBackgroundYOffset = 50
@@ -953,7 +956,9 @@ function GUIScoreboard:Update(deltaTime)
 		local seconds = math.floor(gameTime - minutes * 60)
 
 		local serverName = Client.GetServerIsHidden() and "Hidden" or Client.GetConnectedServerName()
-		local gameTimeText = serverName .. " | " .. Shared.GetMapName() .. string.format(" - %d:%02d", minutes, seconds)
+		local serverPopulation = gInfo:GetNumPlayers()
+		serverPopulation = serverPopulation == 1 and tostring(serverPopulation) .. " player" or tostring(serverPopulation) .. " players"
+		local gameTimeText = serverName .. " | " .. serverPopulation .. " | " .. Shared.GetMapName() .. string.format(" - %d:%02d", minutes, seconds)
 
 		self.gameTime:SetText(gameTimeText)
 
@@ -966,11 +971,11 @@ function GUIScoreboard:Update(deltaTime)
 			self.blockedButton:SetTexture(self.blockedButton.isServerBlocked and self.kBlockedTexture or self.kNotBlockedTexture)
 		end
 
-		local width = -self.gameTime:GetTextWidth(gameTimeText) / 2 - GUIScale(2 * self.kFavoriteIconSize.x + 20)
-		self.favoriteButton:SetPosition(Vector(width, GUIScale(4), 0))
+		local width = self.gameTime:GetTextWidth(gameTimeText) / 2 + (self.kBlockedIconSize.x + GUIScale(30))
+		self.blockedButton:SetPosition(Vector(-width, GUIScale(4), 0))
 
-		width = -self.gameTime:GetTextWidth(gameTimeText) / 2 - GUIScale(self.kBlockedIconSize.x + 10)
-		self.blockedButton:SetPosition(Vector(width, GUIScale(4), 0))
+		width = width + (self.kFavoriteIconSize.x + GUIScale(10))
+		self.favoriteButton:SetPosition(Vector(-width, GUIScale(4), 0))
 
 		-- Get sizes for everything so we can reposition correctly
 		local contentYSize = 0
@@ -1509,6 +1514,8 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 			end
 			if resourcesNumber < GUIScoreboard.kHighPresThreshold then
 				player["Resources"]:SetColor(baseColor)
+            elseif resourcesNumber >= GUIScoreboard.kMaxPresThreshold then
+                player["Resources"]:SetColor(GUIScoreboard.kMaxPresColor)
 			elseif resourcesNumber >= GUIScoreboard.kVeryHighPresThreshold then
 				player["Resources"]:SetColor(GUIScoreboard.kVeryHighPresColor)
 			else

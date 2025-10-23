@@ -53,7 +53,7 @@ function GUIMinimap:UpdateMapClick()
     local playerTeamNr = player:GetTeamNumber()
     if (playerTeamNr == 1 or playerTeamNr == 2 or playerTeamNr == 3) then
         local gameTime, state = PlayerUI_GetGameLengthTime()
-        if state == 4 or (state == 5 and gameTime < 15) then
+        if state == 4 or (state == 5 and gameTime < 30) then
             if FairStartAlienLoc and FairStartMarineLoc then
                 self.FairStartMarine.mark:SetPosition(Vector(self:PlotToMap(FairStartMarineLoc.x, FairStartMarineLoc.z)))
                 self.FairStartMarine.mark:SetIsVisible(true)
