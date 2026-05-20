@@ -18,7 +18,7 @@ local function GUICreateFairStartPing(team)
 
     local image = GetGUIManager():CreateGraphicItem()
     image:SetTexture(kFairStartTexture)
-    --image:SetInheritsParentAlpha(true)
+    -- image:SetInheritsParentAlpha(true)
     image:SetColor(Color(1, 1, 1, 0.8))
     image:SetSize(GUILinearScale(Vector(50, 50, 0)))
     image:SetAnchor(GUIItem.Middle, GUIItem.Center)
@@ -26,14 +26,17 @@ local function GUICreateFairStartPing(team)
     image:SetIsVisible(true)
     mark:AddChild(image)
 
-    return {mark = mark, image = image}
+    return {
+        mark = mark,
+        image = image
+    }
 end
 
 local oldGUIMinimapInitialize = GUIMinimap.Initialize
 function GUIMinimap:Initialize()
     oldGUIMinimapInitialize(self)
 
-    --Add Fairstart thingy
+    -- Add Fairstart thingy
     self.FairStartMarine = GUICreateFairStartPing(1)
     self.FairStartMarine.mark:SetAnchor(GUIItem.Middle, GUIItem.Center)
     self.FairStartMarine.mark:SetLayer(5)
@@ -102,13 +105,17 @@ function GUIMinimap:Update(deltaTime)
         local Player = Client.GetLocalPlayer()
         if GetGameInfoEntity():GetState() == kGameState.Countdown and Player:GetIsOnPlayingTeam() then
             local CurrentCountDown = Player:GetCountDownTime()
-            if (CurrentCountDown < (kCountDownLength - 0.5) and CurrentCountDown > 1.5) or Player:isa("Commander") then
-                local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
-                if minimapFrameScript and minimapFrameScript:LargeMapIsVisible() == false then
-                    shouldClose = true
-                    if minimapFrameScript then
-                        minimapFrameScript:ShowMap(true)
-                        minimapFrameScript:SetBackgroundMode((true and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, nil)
+            if (CurrentCountDown < (kCountDownLength - 0.5) and CurrentCountDown > 1.5) and not Player:isa("Commander") then
+                if not shouldClose then
+                    print("Fair Start - Minimap Open")
+                    local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
+                    if minimapFrameScript and minimapFrameScript:LargeMapIsVisible() == false then
+                        shouldClose = true
+                        if minimapFrameScript then
+                            minimapFrameScript:ShowMap(true)
+                            minimapFrameScript:SetBackgroundMode(
+                                (true and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, nil)
+                        end
                     end
                 end
             elseif shouldClose then

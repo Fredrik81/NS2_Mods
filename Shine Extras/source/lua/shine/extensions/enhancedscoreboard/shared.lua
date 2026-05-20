@@ -70,6 +70,7 @@ end
 local MAX_PLAYER_LENGTH = 1800
 function Plugin:SetupDataTable()
 	self:AddDTVar("boolean", "EnableTeamAvgSkill", false)
+	self:AddDTVar("boolean", "EnableFieldAvgSkill", false)
 	self:AddDTVar("boolean", "EnableTeamAvgSkillPregame", true)
 	self:AddDTVar("boolean", "EnableTeamTotalSkill", true)
 	--self:AddDTVar("boolean", "EnableTeamAvgSph", true)
@@ -80,10 +81,10 @@ function Plugin:SetupDataTable()
 	self:AddDTVar(string.format("string (%d)", 254), "QueueIndex", "{}")
 	self:AddDTVar("integer (0 to 65535)", "marine_avg_skill", 0)
 	self:AddDTVar("integer (0 to 65535)", "alien_avg_skill", 0)
-	self:AddDTVar("integer (0 to 65535)", "marine_total_skill", 0)
-	self:AddDTVar("integer (0 to 65535)", "alien_total_skill", 0)
-	--self:AddDTVar("integer (0 to 65535)", "marine_avg_sph", 0)
-	--self:AddDTVar("integer (0 to 65535)", "alien_avg_sph", 0)
+	self:AddDTVar("integer (0 to 131070)", "marine_total_skill", 0)
+	self:AddDTVar("integer (0 to 131070)", "alien_total_skill", 0)
+	self:AddDTVar("integer (0 to 65535)", "marine_field_avg_skill", 0)
+	self:AddDTVar("integer (0 to 65535)", "alien_field_avg_skill", 0)
 end
 
 --This is called when any datatable variable changes.

@@ -1,5 +1,5 @@
 local DFS_Name = "Devnull - Fair Start"
-local DFS_Version = "2.0"
+local DFS_Version = "2.1"
 if Server or Client then
     HPrint(DFS_Name .. ", version " .. DFS_Version)
 end

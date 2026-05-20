@@ -260,11 +260,9 @@ local function fetchPlayerStats(steamId)
 	--fetchUrl = "https://ns2panel.com/api/stats/players?ids=%s"
 	end
 
-	--myPrint("currentPlayers: " .. dump(steamId))
 	local usersToFetch = nil
 	for i, user in ipairs(steamId) do
 		if not (playerStatsTable[user] and playerStatsTable[user].fetched) then
-			--myPrint("- " .. tostring(user) .. ", MISSING")
 			if usersToFetch then
 				usersToFetch = usersToFetch .. "," .. tostring(user)
 			else
@@ -272,8 +270,6 @@ local function fetchPlayerStats(steamId)
 			end
 			playerStatsTable[user] = {}
 			playerStatsTable[user].fetched = 0
-		else
-			--myPrint("- " .. tostring(user) .. ", EXIST")
 		end
 	end
 
@@ -433,6 +429,7 @@ local function CreateTeamBackground(self, teamNumber)
 	--playerCommIcon:SetPosition(Vector(kPlayerCommIconSize.x, kPlayerCommIconSize.y / 2, 0) * GUIScoreboard.kScalingFactor)
 	teamInfoItems["teamCommIcon"]:SetPosition(Vector(-12 - kPlayerBadgeIconSize, playerDataRowY, 0) * GUIScoreboard.kScalingFactor)
 	--teamInfoItems["teamCommIcon"]:SetStencilFunc(GUIItem.NotEqual)
+	--teamInfoItems["teamCommIcon"]:SetTexture(kPlayerCommIconTexture)
 	teamInfoItems["teamCommIcon"]:SetTexture(kPlayerCommIconTexture)
 	teamInfoItems["teamCommIcon"]:SetIsVisible(isPlayingTeam)
 	--playerCommIcon:SetTexturePixelCoordinates(0, 0, 100, 31)
@@ -896,7 +893,6 @@ function GUIScoreboard:Update(deltaTime)
 					local playingTeam = team.TeamNumber ~= kTeamReadyRoom
 					if playingTeam and player.IsCommander then
 						if lastComm[team.TeamNumber] ~= steamId then
-							--print("Setting last com (" .. tostring(teamNumber) .. ") to: " .. tostring(steamId))
 							lastComm[team.TeamNumber] = steamId
 						end
 					end
@@ -956,7 +952,7 @@ function GUIScoreboard:Update(deltaTime)
 		local seconds = math.floor(gameTime - minutes * 60)
 
 		local serverName = Client.GetServerIsHidden() and "Hidden" or Client.GetConnectedServerName()
-		local serverPopulation = gInfo:GetNumPlayers()
+		local serverPopulation = gInfo:GetNumClientsTotal()
 		serverPopulation = serverPopulation == 1 and tostring(serverPopulation) .. " player" or tostring(serverPopulation) .. " players"
 		local gameTimeText = serverName .. " | " .. serverPopulation .. " | " .. Shared.GetMapName() .. string.format(" - %d:%02d", minutes, seconds)
 
@@ -1111,7 +1107,6 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 	local teamScores = updateTeam["GetScores"]()
 	local teamNumber = updateTeam["TeamNumber"]
 	local isPlayingTeam = teamNumber ~= kTeamReadyRoom
-	--ToDo find a way to add commander time...
 
 	-- Determines if the local player can see secret information
 	-- for this team.
@@ -1205,15 +1200,15 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		local playerStatus = isVisibleTeam and playerRecord.Status or "-"
 		local isDead = isVisibleTeam and playerRecord.Status == deadString
 		local isSteamFriend = playerRecord.IsSteamFriend
-		local playerSkill = playerRecord.Skill
+		local playerSkill = playerRecord.Skill or 0
 		local adagradSum = playerRecord.AdagradSum
 		local commanderColor = GUIScoreboard.kCommanderFontColor
 		local isBot = steamId == 0
 		local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
-
 		if steamId == localPlayerSteamID and playerRecord.IsSpectator then
 			isSpectating = true
 		end
+		local playerCommSkillTier, playerCommSkillTierName = GetPlayerSkillTier(playerRecord.commSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
 
 		-- Get data for tooltip
 		local playerTooltipData = (steamId and steamId > 0 and not isBot) and getPlayerStats(steamId) or nil
@@ -1271,6 +1266,11 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 
 		if (isCommander or (isLastComm and not isBot)) and isPlayingTeam then
 			score = "*"
+			if playerCommSkillTier > 0 then
+				player.CommIcon:SetTexturePixelCoordinates(0, (playerCommSkillTier + 1) * 32, 32, (playerCommSkillTier + 2) * 32)
+			else
+				player.CommIcon:SetTexturePixelCoordinates(0, 0, 32, 32)
+			end
 			player.CommIcon:SetIsVisible(true)
 		else
 			player.CommIcon:SetIsVisible(false)
@@ -1420,7 +1420,6 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 			end
 		end
 
-		--print("dump: " .. dump(playerTooltipData))
 		if isBot then
 			player.SkillIcon.tooltipText = "NS2 Bot"
 		elseif not playerTooltipData then
@@ -1428,29 +1427,27 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		elseif playerTooltipData and playerTooltipData.fetched and playerTooltipData.fetched == 0 then
 			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nNo NS2Panel data!"
 		elseif not isBot and playerTooltipData and playerTooltipData.marine_skill then
-			local midPlayerSkill = ((playerTooltipData.marine_skill or 0) + (playerTooltipData.alien_skill or 0)) / 2
-			local midComSkill = ((playerTooltipData.marine_commander_skill or 0) + (playerTooltipData.alien_commander_skill or 0)) / 2
-			local commTier, commTierName, commCappedSkill = GetPlayerSkillTier(midComSkill, isRookie, adagradSum, isBot)
+			--local midPlayerSkill = ((playerRecord.marineSkill or 0) + (playerRecord.alienSkill or 0)) / 2
 
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", midPlayerSkill)
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
 			if isSpectator or isMarine or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerTooltipData.marine_skill or 0)
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
 			end
 			if isSpectator or isAlien or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerTooltipData.alien_skill or 0)
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
 			end
 			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
 			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(commTierName) .. " (" .. tostring(commTier) .. ")"
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
 			end
 			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", midComSkill)
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
 			end
 			if isSpectator or (isLastComm and isMarine) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerTooltipData.marine_commander_skill or 0)
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
 			end
 			if isSpectator or (isLastComm and isAlien) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerTooltipData.alien_commander_skill or 0)
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
 			end
 			if isSpectator or isLastComm or isPreGame then
 				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
@@ -2063,15 +2060,13 @@ function GUIScoreboard:CreatePlayerItem()
 	--playerCommIcon:SetPosition(Vector(kPlayerCommIconSize.x, kPlayerCommIconSize.y / 2, 0) * GUIScoreboard.kScalingFactor)
 	playerCommIcon:SetPosition(Vector(-4, -3, 0) * GUIScoreboard.kScalingFactor)
 	playerCommIcon:SetStencilFunc(GUIItem.NotEqual)
-	playerCommIcon:SetTexture(kPlayerCommIconTexture)
+	playerCommIcon:SetTexture(kPlayerCommIconsTexture)
 	playerCommIcon:SetIsVisible(false)
-	--playerCommIcon:SetTexturePixelCoordinates(0, 0, 100, 31)
+	playerCommIcon:SetTexturePixelCoordinates(0, 0, 32, 32)
 	--playerItem:AddChild(playerCommIcon)
 	playerSkillIcon:AddChild(playerCommIcon)
 
 	local upgradeIcons = {}
-	--print("GUIScoreboard.kScalingFactor: " .. tostring(GUIScoreboard.kScalingFactor))
-	--print("GUIScoreboard.screenHeight: " .. tostring(GUIScoreboard.screenHeight))
 	local startXupgrades = currentColumnX + ConditionalValue(GUIScoreboard.screenWidth < 1280, 30, 60)
 	upgradeIcons["marineWelder"] = GUIManager:CreateGraphicItem()
 	upgradeIcons["marineWelder"]:SetColor(RGBAtoColor(255, 255, 255, 1))

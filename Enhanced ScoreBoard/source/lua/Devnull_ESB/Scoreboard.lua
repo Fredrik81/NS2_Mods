@@ -1,31 +1,31 @@
---=============================================================================
+-- =============================================================================
 --
 -- lua/Scoreboard.lua
--- 
+--
 -- Created by Henry Kropf and Charlie Cleveland
 -- Copyright 2011, Unknown Worlds Entertainment
 --
---=============================================================================
-
+-- =============================================================================
 --[[
  * Main purpose it to maintain a cache for player info, allowing information for a player
  * to be retrived by a players clientIndex or playerName.
  *
- * Originally intended to be used by the scoreboard, therefore its name. 
+ * Originally intended to be used by the scoreboard, therefore its name.
  * Should probably be renamed PlayerRecords or PlayerDatabase
  *
  * Keeps track of when it was last updated and avoids updating more often than kMaxPlayerDataAge
 ]]
+
 Script.Load("lua/Insight.lua")
 
 -- primary lookup table with clientIndex (clientId) as key
 local playerData = unique_map()
 
 -- index with player name as key
-local playerDataByName = { }
+local playerDataByName = {}
 
 -- sorted list by score
-local sortedPlayerData = { }
+local sortedPlayerData = {}
 
 local lastPlayerDataUpdateTime = 0
 local kMaxPlayerDataAge = 0.5
@@ -64,17 +64,19 @@ local kStatusTranslationStringMap = {
     [kPlayerStatus.GorgeEgg] = "GORGE_EGG",
     [kPlayerStatus.LerkEgg] = "LERK_EGG",
     [kPlayerStatus.FadeEgg] = "FADE_EGG",
-    [kPlayerStatus.OnosEgg] = "ONOS_EGG",
+    [kPlayerStatus.OnosEgg] = "ONOS_EGG"
 }
 
 local function dump(o)
-    if type(o) == 'table' then
-        local s = '{ '
-        for k,v in pairs(o) do
-            if type(k) ~= 'number' then k = '"'..k..'"' end
-            s = s .. '['..k..'] = ' .. dump(v) .. ','
+    if type(o) == "table" then
+        local s = "{ "
+        for k, v in pairs(o) do
+            if type(k) ~= "number" then
+                k = '"' .. k .. '"'
+            end
+            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
         end
-        return s .. '} '
+        return s .. "} "
     else
         return tostring(o)
     end
@@ -82,9 +84,10 @@ end
 
 -- reloads the player data. Should be no need to call this, as player data is reloaded on demand
 function Scoreboard_ReloadPlayerData()
-
     PROFILE("Scoreboard:ReloadPlayerData")
     lastPlayerDataUpdateTime = Shared.GetTime()
+
+    local tdEnabled = Shared.GetThunderdomeEnabled()
 
     for _, pie in ientitylist(Shared.GetEntitiesWithClassname("PlayerInfoEntity")) do
 
@@ -121,55 +124,75 @@ function Scoreboard_ReloadPlayerData()
         playerRecord.IsSpectator = pie.isSpectator
         playerRecord.Assists = pie.assists
         playerRecord.SteamId = pie.steamId
-        playerRecord.Skill = pie.playerSkill
-        playerRecord.CommSkill = pie.playerCommSkill
-        playerRecord.AdagradSum = pie.adagradSum
+
+        -- TeamSpecific Skill Calculation
+        playerRecord.playerSkill = tdEnabled and pie.playerTDSkill or pie.playerSkill
+        playerRecord.playerCommSkill = tdEnabled and pie.playerTDCommSkill or pie.playerCommSkill
+        playerRecord.marineSkill = tdEnabled and pie.playerTDSkill + pie.playerTDSkillOffset or pie.playerSkill + pie.playerSkillOffset
+        playerRecord.marineCommSkill = tdEnabled and pie.playerTDCommSkill + pie.playerTDCommSkillOffset or pie.playerCommSkill + pie.playerCommSkillOffset
+        playerRecord.alienSkill = tdEnabled and pie.playerTDSkill - pie.playerTDSkillOffset or pie.playerSkill - pie.playerSkillOffset
+        playerRecord.alienCommSkill = tdEnabled and pie.playerTDCommSkill - pie.playerTDCommSkillOffset or pie.playerCommSkill - pie.playerCommSkillOffset
+
+        if pie.teamNumber == kTeam1Index then
+            playerRecord.Skill = playerRecord.marineSkill
+            playerRecord.commSkill = playerRecord.marineCommSkill
+        elseif pie.teamNumber == kTeam2Index then
+            playerRecord.Skill = playerRecord.alienSkill
+            playerRecord.commSkill = playerRecord.alienCommSkill
+        else
+            -- FIXME This is a bit wonky in TD context, as in RR would be, odd...to not use assigned team. BLEH
+            playerRecord.Skill = tdEnabled and pie.playerTDSkill or pie.playerSkill
+        end
+
+        playerRecord.AdagradSum = tdEnabled and pie.playerTDAdagrad or pie.adagradSum
+        playerRecord.CommAdagradSum = tdEnabled and pie.playerTDCommAdagrad or pie.commAdagradSum
         playerRecord.Tech = pie.currentTech
         playerRecord.CallingCard = pie.callingCard
 
-        print("playerRecord: " .. tostring(playerRecord.Tech))
-
         if playerRecord.IsCommander then
-
             local playerEnt = Shared.GetEntity(playerRecord.EntityId)
             if playerEnt then
 
                 local commanderTeam = playerEnt:GetTeamType()
                 if commanderTeam == kMarineTeamType then
-                    kLastMarineCommanderInfo =
-                    {
-                        CallingCard = playerRecord.CallingCard,
-                        Name = playerRecord.Name,
+                    if kLastMarineCommanderInfo and kLastMarineCommanderInfo.SteamId32 == playerRecord.SteamId then
+                        print("marine commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                    else
+                        print("Updating marine commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                        kLastMarineCommanderInfo = {
+                            CallingCard = playerRecord.CallingCard,
+                            Name = playerRecord.Name,
 
-                        -- Skill Badge Info
-                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
-                        Skill = playerRecord.Skill,
-                        AdagradSum = playerRecord.AdagradSum,
-                        Rookie = playerRecord.IsRookie
-                    }
+                            -- Skill Badge Info
+                            SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                            Skill = playerRecord.Skill,
+                            AdagradSum = playerRecord.AdagradSum,
+                            Rookie = playerRecord.IsRookie
+                        }
+                    end
                 elseif commanderTeam == kAlienTeamType then
-                    kLastAlienCommanderInfo =
-                    {
-                        CallingCard = playerRecord.CallingCard,
-                        Name = playerRecord.Name,
+                    if kLastAlienCommanderInfo and kLastAlienCommanderInfo.SteamId32 == playerRecord.SteamId and kLastAlienCommanderInfo.Name == playerRecord.Name then
+                        print("alien commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                    else
+                        print("Setting alien commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                        kLastAlienCommanderInfo = {
+                            CallingCard = playerRecord.CallingCard,
+                            Name = playerRecord.Name,
 
-                        -- Skill Badge Info
-                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
-                        Skill = playerRecord.Skill,
-                        AdagradSum = playerRecord.AdagradSum,
-                        Rookie = playerRecord.IsRookie
-                    }
+                            -- Skill Badge Info
+                            SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                            Skill = playerRecord.Skill,
+                            AdagradSum = playerRecord.AdagradSum,
+                            Rookie = playerRecord.IsRookie
+                        }
+                    end
                 end
-
             end
-
-
         end
-
     end
 
-    sortedPlayerData = { }
-    playerDataByName = { }
+    sortedPlayerData = {}
+    playerDataByName = {}
 
     -- clean out old player records
     for clientIndex, playerRecord in playerData:IterateBackwards() do
@@ -182,12 +205,10 @@ function Scoreboard_ReloadPlayerData()
     end
 
     Scoreboard_Sort()
-
 end
 
 -- call this to ensure that the data is reasonably up-to-date
 local function CheckForReload()
-
     if Shared.GetTime() - lastPlayerDataUpdateTime > kMaxPlayerDataAge then
         Scoreboard_ReloadPlayerData()
         return true
@@ -198,31 +219,26 @@ end
 
 -- Returns the playerRecord for the given players clientIndex, reloading player data if required
 function Scoreboard_GetPlayerRecord(clientIndex)
-    
     PROFILE("Scoreboard_GetPlayerRecord")
-    
+
     if not CheckForReload() and playerData:Get(clientIndex) == nil then
         -- updates playerData
         Scoreboard_ReloadPlayerData()
     end
 
     return playerData:Get(clientIndex)
-
 end
 
 -- Returns the playerRecord for the given players name, reloading player data if required
 function Scoreboard_GetPlayerRecordByName(playerName)
-
     if not CheckForReload() and playerDataByName[playerName] == nil then
         Scoreboard_ReloadPlayerData()
     end
 
     return playerDataByName[playerName]
-
 end
 
 function Insight_SetPlayerHealth(clientIndex, health, maxHealth, armor, maxArmor)
-
     local playerRecord = Scoreboard_GetPlayerRecord(clientIndex)
     if playerRecord then
         playerRecord.Health = health
@@ -230,19 +246,15 @@ function Insight_SetPlayerHealth(clientIndex, health, maxHealth, armor, maxArmor
         playerRecord.Armor = armor
         playerRecord.MaxArmor = maxArmor
     end
-
 end
 
 function Scoreboard_Clear()
-
     playerData:Clear()
     Insight_Clear()
-
 end
 
 -- Score > Kills > Deaths > Resources
 local function sortByScore(player1, player2)
-
     if player1.EntityTeamNumber == player2.EntityTeamNumber then
 
         if player1.Score == player2.Score then
@@ -289,7 +301,6 @@ function Scoreboard_SetPing(clientIndex, ping)
     if playerRecord then
         playerRecord.Ping = ping
     end
-
 end
 
 -- Set local data for player so scoreboard updates instantly (used only in test)
@@ -297,45 +308,40 @@ function Scoreboard_SetLocalPlayerData(_, index, data)
     playerData:Insert(index, data)
 end
 
-
 function Scoreboard_GetPlayerName(clientIndex)
-
     local record = Scoreboard_GetPlayerRecord(clientIndex)
     return record and record.Name or "Admin"
-
 end
 
 function Scoreboard_GetPlayerList()
-
     CheckForReload()
 
-    local playerList = { }
+    local playerList = {}
     for p = 1, #sortedPlayerData do
 
         local playerRecord = sortedPlayerData[p]
-        table.insert(playerList, { name = playerRecord.Name, client_index = playerRecord.ClientIndex })
+        table.insert(playerList, {
+            name = playerRecord.Name,
+            client_index = playerRecord.ClientIndex
+        })
 
     end
 
     return playerList
-
 end
 
 function Scoreboard_GetPlayerData(clientIndex, dataType)
-    
     PROFILE("Scoreboard_GetPlayerData")
-    
+
     -- often used to avoid a null-check
     local playerRecord = Scoreboard_GetPlayerRecord(clientIndex)
     return playerRecord and playerRecord[dataType]
-
 end
 
 --[[
  * Get table of scoreboard player records for all players with team numbers in specified table.
 ]]
 function GetScoreData(teamNumberArray)
-
     local scoreData = {}
     local players = {}
 
@@ -374,36 +380,34 @@ end
  * Get score data for the blue team
 ]]
 function ScoreboardUI_GetBlueScores()
-    return GetScoreData({ kTeam1Index })
+    return GetScoreData({kTeam1Index})
 end
 
 --[[
  * Get score data for the red team
 ]]
 function ScoreboardUI_GetRedScores()
-    return GetScoreData({ kTeam2Index })
+    return GetScoreData({kTeam2Index})
 end
 
 --[[
  * Get score data for everyone not playing.
 ]]
 function ScoreboardUI_GetSpectatorScores()
-    return GetScoreData({ kTeamReadyRoom, kSpectatorIndex })
+    return GetScoreData({kTeamReadyRoom, kSpectatorIndex})
 end
 
 function ScoreboardUI_GetAllScores()
-    return GetScoreData({ kTeam1Index, kTeam2Index, kTeamReadyRoom, kSpectatorIndex })
+    return GetScoreData({kTeam1Index, kTeam2Index, kTeamReadyRoom, kSpectatorIndex})
 end
 
 function ScoreboardUI_GetTeamResources(teamNumber)
-
     local teamInfo = GetEntitiesForTeam("TeamInfo", teamNumber)
     if #teamInfo > 0 then
         return teamInfo[1]:GetTeamResources()
     end
 
     return 0
-
 end
 
 --[[
@@ -432,7 +436,6 @@ end
 ]]
 kActualClientId = nil
 function ScoreboardUI_IsPlayerLocal(playerName)
-
     local player = Client.GetLocalPlayer()
 
     -- make the scoreboard use the player's actual id to highlight
@@ -452,27 +455,19 @@ function ScoreboardUI_IsPlayerLocal(playerName)
     end
 
     return false
-
 end
 
 function ScoreboardUI_IsPlayerCommander(playerName)
-
     local playerRecord = Scoreboard_GetPlayerRecordByName(playerName)
     return playerRecord and playerRecord.IsCommander
-
 end
 
 function ScoreboardUI_IsPlayerRookie(playerName)
-
     local playerRecord = Scoreboard_GetPlayerRecordByName(playerName)
     return playerRecord and playerRecord.IsRookie
-
 end
 
-
-
 function ScoreboardUI_GetTeamHasCommander(teamNumber)
-
     CheckForReload()
 
     for i = 1, #sortedPlayerData do
@@ -485,11 +480,9 @@ function ScoreboardUI_GetTeamHasCommander(teamNumber)
     end
 
     return false
-
 end
 
 function ScoreboardUI_GetCommanderName(teamNumber)
-
     CheckForReload()
 
     for i = 1, #sortedPlayerData do
@@ -502,12 +495,10 @@ function ScoreboardUI_GetCommanderName(teamNumber)
     end
 
     return nil
-
 end
 
 -- Expensive! Avoid usage!
 function ScoreboardUI_GetOrderedCommanderNames(teamNumber)
-
     CheckForReload()
     local commanders = {}
 
@@ -517,7 +508,7 @@ function ScoreboardUI_GetOrderedCommanderNames(teamNumber)
         local playerRecord = sortedPlayerData[i]
 
         if playerRecord.EntityTeamNumber == teamNumber and playerRecord.IsCommander then
-            table.insert( commanders, {playerRecord.EntityId, playerRecord.Name} )
+            table.insert(commanders, {playerRecord.EntityId, playerRecord.Name})
         end
 
     end
@@ -536,12 +527,10 @@ function ScoreboardUI_GetOrderedCommanderNames(teamNumber)
     end
 
     return commanderNames
-
 end
 
 -- Expensive! Avoid usage!
 function ScoreboardUI_GetNumberOfAliensByType(alienType)
-
     CheckForReload()
     local numberOfAliens = 0
 
@@ -554,5 +543,4 @@ function ScoreboardUI_GetNumberOfAliensByType(alienType)
     end
 
     return numberOfAliens
-
 end

@@ -9,6 +9,7 @@ Plugin.ConfigName = "EnhancedScoreboard.json"
 
 Plugin.DefaultConfig = {
 	EnableTeamAvgSkill = false,
+	EnableFieldAvgSkill = false,
 	EnableTeamAvgSkillPregame = false,
 	EnableTeamTotalSkill = false,
 	EnableLocationInfo = true,
@@ -248,6 +249,7 @@ function Plugin:Initialise()
 	self:CreateHooks()
 
 	self.dt.EnableTeamAvgSkill = self.Config.EnableTeamAvgSkill -- or Plugin.DefaultConfig.EnableTeamAvgSkill
+	self.dt.EnableFieldAvgSkill = self.Config.EnableFieldAvgSkill -- or Plugin.DefaultConfig.EnableFieldAvgSkill
 	self.dt.EnableTeamAvgSkillPregame = self.Config.EnableTeamAvgSkillPregame -- or Plugin.DefaultConfig.EnableTeamAvgSkillPregame
 	self.dt.EnableTeamTotalSkill = self.Config.EnableTeamTotalSkill -- or Plugin.DefaultConfig.EnableTeamTotalSkill
 	self.dt.EnableQueueInfo = self.Config.EnableQueueInfo
@@ -297,7 +299,7 @@ function Plugin:RecHiveData(client, data)
 		if data then
 			self.PlayerTable[steamId].hive = data
 			self.PlayerTable[steamId].adminData = Plugin:adminDataPermission(client, steamId)
-			--print("HiveDump: " .. dump(data))
+			print("HiveDump: " .. dump(data))
 			if self.Config.EnableLocationInfo and (not self.PlayerTable[steamId].location) then
 				--HPrint("Featch player location!")
 				getClientLocationData(client)
@@ -391,6 +393,7 @@ function Plugin:GetTeamsAvgSkill()
 		return {math.max(0, teamStats[1].Average), math.max(0, teamStats[2].Average)}
 	end
 
+	print("Voterandom not found or not enabled!")
 	return {0, 0}
 end
 
@@ -401,19 +404,24 @@ function Plugin:GetTeamsTotalSkill()
 
 		return {math.max(0, teamStats[1].Total), math.max(0, teamStats[2].Total)}
 	end
-
+	print("Voterandom not found or not enabled!")
 	return {0, 0}
 end
 
 function Plugin:SendESB_TeamAverages()
+	print("SendESB_TeamAverages called")
 	if Plugin.dt.EnableTeamAvgSkill or Plugin.dt.EnableTeamAvgSkillPregame then
+		print("Calculating avg skills...")
 		local avgSkills = Plugin.GetTeamsAvgSkill()
+		print("Avg skills: " .. dump(avgSkills))
 		Plugin.dt.marine_avg_skill = avgSkills[1]
 		Plugin.dt.alien_avg_skill = avgSkills[2]
 	end
 
 	if Plugin.dt.EnableTeamTotalSkill then
+		print("Calculating total skills...")
 		local totalSkills = Plugin.GetTeamsTotalSkill()
+		print("Total skills: " .. dump(totalSkills))
 		Plugin.dt.marine_total_skill = totalSkills[1]
 		Plugin.dt.alien_total_skill = totalSkills[2]
 	end

@@ -1,6 +1,6 @@
 local Plugin = Shine.Plugin(...)
 Plugin.Version = "1.2"
-Plugin.PrintName = "[Shine] Forced Notification"
+Plugin.PrintName = "Devnull - [Shine] Forced Notification"
 Plugin.PrintVersion = "1.4"
 Plugin.DefaultState = true
 
