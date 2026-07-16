@@ -1,4 +1,4 @@
-local kVersion = "1.9.4"
+local kVersion = "1.9.5"
 local kName = "Devnull - Enhanced Scoreboard"
 
 if Client then

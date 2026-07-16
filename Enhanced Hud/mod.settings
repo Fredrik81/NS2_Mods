@@ -1,0 +1,9 @@
+name        = "Devnull - Enhanced Hud"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[Addes enhancement to hud and map.
+
+This mod is based off Drey's Enhanced Hud]=]
+image       = "preview.jpg"
+tag_modtype = "Look and Feel"
+tag_support = "Must be run on Server"

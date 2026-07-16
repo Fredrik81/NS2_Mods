@@ -312,7 +312,7 @@ local function enumContainElement(enum, element)
 	end
 	return false
 end
-local techCarapaceWorkaround = enumContainElement(kTechId, "Resilience")
+local techCarapaceWorkaround = nil
 
 local function getPlayerStats(steamId)
 	if not steamId then
@@ -582,6 +582,9 @@ function GUIScoreboard:Initialize()
 	self.updateInterval = 0.2
 
 	self.visible = false
+
+	-- Carapace workaround for CBM
+	techCarapaceWorkaround = enumContainElement(kTechId, "Resilience")
 
 	self.teams = {}
 	self.reusePlayerItems = {}

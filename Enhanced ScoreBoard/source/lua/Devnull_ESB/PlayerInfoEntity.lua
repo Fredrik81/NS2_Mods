@@ -1,29 +1,111 @@
-local function dump(o)
-    if type(o) == "table" then
-        local s = "{ "
-        for k, v in pairs(o) do
-            if type(k) ~= "number" then
-                k = '"' .. k .. '"'
-            end
-            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
+-- Keep these lists in the same order as the active PlayerInfoEntity source.
+-- Bit positions depend on order/content, so even one extra entry shifts decode.
+local kTrackedTechUpgradeNamesVanilla = {
+    "Jetpack",
+    "Welder",
+    "ClusterGrenade",
+    "PulseGrenade",
+    "GasGrenade",
+    "Mine",
+    "Vampirism",
+    "Carapace",
+    "Regeneration",
+    "Aura",
+    "Focus",
+    "Camouflage",
+    "Celerity",
+    "Adrenaline",
+    "Crush",
+    "Parasite",
+    "DualMinigunExosuit",
+    "DualRailgunExosuit"
+}
+
+local kTrackedTechUpgradeNamesCBM = {
+    "Jetpack",
+    "Welder",
+    "ClusterGrenade",
+    "PulseGrenade",
+    "GasGrenade",
+    "ScanGrenade",
+    "Mine",
+    "Vampirism",
+    "__SHELL__",
+    "Regeneration",
+    "Aura",
+    "Focus",
+    "Camouflage",
+    "Celerity",
+    "Adrenaline",
+    "Crush",
+    "Parasite",
+    "DualMinigunExosuit",
+    "DualRailgunExosuit"
+}
+
+local techUpgradesTable = {}
+local techUpgradesBitmask = {}
+local techUpgradeSignature = ""
+
+local function GetTrackedTechUpgradeNames()
+    if kCBMaddon then
+        return kTrackedTechUpgradeNamesCBM
+    end
+
+    return kTrackedTechUpgradeNamesVanilla
+end
+
+local function ResolveTrackedTechName(techName)
+    if techName == "__SHELL__" then
+        if kTechId.Resilience ~= nil then
+            return "Resilience"
         end
-        return s .. "} "
-    else
-        return tostring(o)
+        return "Carapace"
+    end
+
+    return techName
+end
+
+local function RebuildTechUpgradeTables()
+    local resolvedTechIds = {}
+
+    for _, trackedTechName in ipairs(GetTrackedTechUpgradeNames()) do
+        local techName = ResolveTrackedTechName(trackedTechName)
+        local techId = kTechId[techName]
+        if techId ~= nil and techId ~= kTechId.None then
+            table.insert(resolvedTechIds, techId)
+        end
+    end
+
+    techUpgradesTable = resolvedTechIds
+    techUpgradesBitmask = CreateBitMask(techUpgradesTable)
+end
+
+local function BuildTechUpgradeSignature()
+    local parts = {}
+
+    for _, trackedTechName in ipairs(GetTrackedTechUpgradeNames()) do
+        local techName = ResolveTrackedTechName(trackedTechName)
+        table.insert(parts, tostring(kTechId[techName] or -1))
+    end
+
+    return table.concat(parts, ":")
+end
+
+local function EnsureTechUpgradeTablesCurrent()
+    local newSignature = BuildTechUpgradeSignature()
+    if techUpgradeSignature ~= newSignature then
+        techUpgradeSignature = newSignature
+        RebuildTechUpgradeTables()
     end
 end
 
-local techUpgradesTable = {kTechId.Jetpack, kTechId.Welder, kTechId.ClusterGrenade, kTechId.PulseGrenade,
-                           kTechId.GasGrenade, kTechId.Mine, kTechId.Vampirism, kTechId.Carapace, kTechId.Regeneration,
-
-                           kTechId.Aura, kTechId.Focus, kTechId.Camouflage, kTechId.Celerity, kTechId.Adrenaline,
-                           kTechId.Crush, kTechId.Parasite, kTechId.DualMinigunExosuit, kTechId.DualRailgunExosuit}
-
-local techUpgradesBitmask = CreateBitMask(techUpgradesTable)
-
+EnsureTechUpgradeTablesCurrent()
 local oldPlayerInfoEntityUpdateScore = PlayerInfoEntity.UpdateScore
 
 function GetTechIdsFromBitMask(techTable)
+    EnsureTechUpgradeTablesCurrent()
+
     local techIds = {}
 
     if techTable and techTable > 0 then
@@ -44,12 +126,7 @@ function GetTechIdsFromBitMask(techTable)
 end
 
 function PlayerInfoEntity:UpdateScore()
-    techUpgradesTable = {kTechId.Jetpack, kTechId.Welder, kTechId.ClusterGrenade, kTechId.PulseGrenade,
-                         kTechId.GasGrenade, kTechId.Mine, kTechId.Vampirism, kTechId.Carapace, kTechId.Regeneration,
-
-                         kTechId.Aura, kTechId.Focus, kTechId.Camouflage, kTechId.Celerity, kTechId.Adrenaline,
-                         kTechId.Crush, kTechId.Parasite, kTechId.DualMinigunExosuit, kTechId.DualRailgunExosuit}
-    techUpgradesBitmask = CreateBitMask(techUpgradesTable)
+    EnsureTechUpgradeTablesCurrent()
 
     local ret = oldPlayerInfoEntityUpdateScore(self)
     if Server then

@@ -156,9 +156,9 @@ function Scoreboard_ReloadPlayerData()
                 local commanderTeam = playerEnt:GetTeamType()
                 if commanderTeam == kMarineTeamType then
                     if kLastMarineCommanderInfo and kLastMarineCommanderInfo.SteamId32 == playerRecord.SteamId then
-                        print("marine commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                        --print("marine commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
                     else
-                        print("Updating marine commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                        --print("Updating marine commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
                         kLastMarineCommanderInfo = {
                             CallingCard = playerRecord.CallingCard,
                             Name = playerRecord.Name,
@@ -172,9 +172,9 @@ function Scoreboard_ReloadPlayerData()
                     end
                 elseif commanderTeam == kAlienTeamType then
                     if kLastAlienCommanderInfo and kLastAlienCommanderInfo.SteamId32 == playerRecord.SteamId and kLastAlienCommanderInfo.Name == playerRecord.Name then
-                        print("alien commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                        --print("alien commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
                     else
-                        print("Setting alien commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
+                        --print("Setting alien commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
                         kLastAlienCommanderInfo = {
                             CallingCard = playerRecord.CallingCard,
                             Name = playerRecord.Name,
