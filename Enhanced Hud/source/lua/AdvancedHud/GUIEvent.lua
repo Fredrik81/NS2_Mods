@@ -1,1 +1,0 @@
--- GUIEvent base behavior is unchanged; this file is intentionally minimal and post-hooked.

@@ -1,9 +1,20 @@
 name        = "Devnull - Enhanced Hud"
 source_dir  = "source"
 output_dir  = "output"
-description = [=[Addes enhancement to hud and map.
+description = [=[This mod is based off Drey's Enhanced Hud and credit goes to him.
 
-This mod is based off Drey's Enhanced Hud]=]
+A cleaner, information-rich HUD overhaul for Natural Selection 2 that improves commander awareness and team status readability without changing core gameplay.
+- Enhanced top bar metrics for key team resources and status
+- RT display upgraded to show current/total nodes in one compact view
+- Color-coded warnings for low RT count to improve at-a-glance decision making
+- Improved alien research notifications in the HUD event feed
+- Biomass research integrated into the same notification system as other upgrades
+- Location text shown for alien research notifications to indicate where upgrades are happening
+- Cleaner commander/selection panel quality-of-life improvements
+Unit status and weapon-display related HUD refinements
+- General UI polish and consistency updates across multiple HUD elements
+]=]
 image       = "preview.jpg"
 tag_modtype = "Look and Feel"
 tag_support = "Must be run on Server"
+publish_id = 3765927260

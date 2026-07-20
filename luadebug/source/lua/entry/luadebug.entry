@@ -1,0 +1,4 @@
+modEntry = {
+	FileHooks = "lua/luadebug/run.lua",
+	Priority = 205
+}
