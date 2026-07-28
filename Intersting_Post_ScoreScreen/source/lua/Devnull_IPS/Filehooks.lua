@@ -1,5 +1,5 @@
 local DIPS_Name = "Devnull - Interesting Post Scoreboard"
-local DIPS_Version = "2.5.1"
+local DIPS_Version = "2.6"
 kDevnull_IPS = DIPS_Version
 if Server or Client then
     HPrint(DIPS_Name .. ", version " .. DIPS_Version)
@@ -19,13 +19,11 @@ if Server then
     ModLoader.SetupFileHook("lua/Weapons/Marine/PulseGrenade.lua", "lua/Devnull_IPS/Weapons/Marine/PulseGrenade.lua", "post")
 
     ModLoader.SetupFileHook("lua/ParasiteMixin.lua", "lua/Devnull_IPS/ParasiteMixin.lua", "post")
-    --ModLoader.SetupFileHook("lua/Weapons/Alien/HealSprayMixin.lua", "lua/Devnull_IPS/Weapons/Alien/HealSprayMixin.lua", "post")
     ModLoader.SetupFileHook("lua/Weapons/Marine/LayMines.lua", "lua/Devnull_IPS/Weapons/Marine/LayMines.lua", "post")
     ModLoader.SetupFileHook("lua/LiveMixin.lua", "lua/Devnull_IPS/LiveMixin.lua", "post")
     ModLoader.SetupFileHook("lua/MedPack.lua", "lua/Devnull_IPS/MedPack.lua", "post")
 
-    -- pres calculations for pres graph, commented out for LessNetworkData
-    --ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/Devnull_IPS/NS2Gamerules.lua", "post")
+    ModLoader.SetupFileHook("lua/NS2Gamerules.lua", "lua/Devnull_IPS/NS2Gamerules.lua", "post")
 end
 
 if Client then

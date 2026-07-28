@@ -1,4 +1,4 @@
-local kVersion = "1.2"
+local kVersion = "1.3"
 local kName = "Devnull - Enhanced Hud"
 
 Script.Load("lua/AdvancedHud/BiomassNotificationLocation.lua")

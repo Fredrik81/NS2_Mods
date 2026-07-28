@@ -154,38 +154,28 @@ function Scoreboard_ReloadPlayerData()
             if playerEnt then
 
                 local commanderTeam = playerEnt:GetTeamType()
-                if commanderTeam == kMarineTeamType then
-                    if kLastMarineCommanderInfo and kLastMarineCommanderInfo.SteamId32 == playerRecord.SteamId then
-                        --print("marine commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
-                    else
-                        --print("Updating marine commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
-                        kLastMarineCommanderInfo = {
-                            CallingCard = playerRecord.CallingCard,
-                            Name = playerRecord.Name,
+                if commanderTeam == kMarineTeamType and not (kLastMarineCommanderInfo and kLastMarineCommanderInfo.SteamId32 == playerRecord.SteamId) then
+                    kLastMarineCommanderInfo = {
+                        CallingCard = playerRecord.CallingCard,
+                        Name = playerRecord.Name,
 
-                            -- Skill Badge Info
-                            SteamId32 = playerRecord.SteamId, -- Bot? == 0
-                            Skill = playerRecord.Skill,
-                            AdagradSum = playerRecord.AdagradSum,
-                            Rookie = playerRecord.IsRookie
-                        }
-                    end
-                elseif commanderTeam == kAlienTeamType then
-                    if kLastAlienCommanderInfo and kLastAlienCommanderInfo.SteamId32 == playerRecord.SteamId and kLastAlienCommanderInfo.Name == playerRecord.Name then
-                        --print("alien commander info correct: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
-                    else
-                        --print("Setting alien commander info: " .. playerRecord.Name .. " (" .. tostring(playerRecord.SteamId) .. ")")
-                        kLastAlienCommanderInfo = {
-                            CallingCard = playerRecord.CallingCard,
-                            Name = playerRecord.Name,
+                        -- Skill Badge Info
+                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                        Skill = playerRecord.Skill,
+                        AdagradSum = playerRecord.AdagradSum,
+                        Rookie = playerRecord.IsRookie
+                    }
+                elseif commanderTeam == kAlienTeamType and not (kLastAlienCommanderInfo and kLastAlienCommanderInfo.SteamId32 == playerRecord.SteamId) then
+                    kLastAlienCommanderInfo = {
+                        CallingCard = playerRecord.CallingCard,
+                        Name = playerRecord.Name,
 
-                            -- Skill Badge Info
-                            SteamId32 = playerRecord.SteamId, -- Bot? == 0
-                            Skill = playerRecord.Skill,
-                            AdagradSum = playerRecord.AdagradSum,
-                            Rookie = playerRecord.IsRookie
-                        }
-                    end
+                        -- Skill Badge Info
+                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                        Skill = playerRecord.Skill,
+                        AdagradSum = playerRecord.AdagradSum,
+                        Rookie = playerRecord.IsRookie
+                    }
                 end
             end
         end

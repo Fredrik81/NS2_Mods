@@ -1,29 +1,66 @@
 -- complete file is commented out at the Filehooks due for LessNetworkData
-
+local function dump(o)
+    if type(o) == "table" then
+        local s = "{ "
+        for k, v in pairs(o) do
+            if type(k) ~= "number" then
+                k = '"' .. k .. '"'
+            end
+            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
+        end
+        return s .. "} "
+    else
+        return tostring(o)
+    end
+end
 
 if Server then
+    -- define variables to keep track if we need to update the pres graph data for marines and aliens
+    local marinePreUsed = -1
+    local alienPreUsed = -1
+    local marinePreEquipped = -1
+    local alienPreEquipped = -1
 
-    local kUpdateGraphInterval = kResourceTowerResourceInterval --collect pres amount data every 6 seconds,
+    local function roundNumber(number, decimals)
+        if number and IsNumber(number) then
+            if decimals > 0 then
+                decimals = 10 ^ decimals
+                number = number * decimals
+                number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
+                number = number / decimals
+            else
+                number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
+            end
+
+            return number
+        else
+            return 0
+        end
+    end
+
+    local kUpdateGraphInterval = kResourceTowerResourceInterval -- collect pres amount data every 6 seconds,
 
     local oldNS2GamerulesOnCreate = NS2Gamerules.OnCreate
     function NS2Gamerules:OnCreate()
         oldNS2GamerulesOnCreate(self)
         self.lastUpdatePresGraphMarine = -100 -- start negative to always collect at gamesecond 0
         self.lastUpdatePresGraphAlien = -100
-
     end
 
     local oldNS2GamerulesOnUpdate = NS2Gamerules.OnUpdate
     function NS2Gamerules:OnUpdate(timePassed)
         oldNS2GamerulesOnUpdate(self, timePassed)
 
-        if Server and  self:GetMapLoaded() and self:GetGameState() == kGameState.Started then
-
+        if Server and self:GetMapLoaded() and self:GetGameState() == kGameState.Started then
             if self.lastUpdatePresGraphMarine + kUpdateGraphInterval <= self.timeSinceGameStateChanged then
-
                 local teamIndex = 1
-                local teamInfo = GetEntitiesForTeam("TeamInfo", teamIndex)
-                local currentRTs = teamInfo[1]:GetNumResourceTowers()
+                local currentRTs = 0
+                -- local teamInfo = GetEntitiesForTeam("TeamInfo", teamIndex)
+                local teamInfo = GetTeamInfoEntity(teamIndex)
+                -- if teamInfo and teamInfo[1] then
+                if teamInfo then
+                    currentRTs = teamInfo:GetNumResourceTowers() or 0
+                end
 
                 local team = GetEntitiesForTeam("Player", teamIndex)
 
@@ -32,13 +69,13 @@ if Server then
                 local playerCount = 0
 
                 local emptyExos = GetEntitiesForTeam("Exosuit", teamIndex)
-                presEquipped  = presEquipped + #emptyExos * kDualExosuitCost -- TODO separate check for railguns and miniguns?
+                presEquipped = presEquipped + #emptyExos * kDualExosuitCost -- TODO separate check for railguns and miniguns?
                 -- Log("emptyExos %s", emptyExos)
                 local droppedJps = GetEntitiesForTeam("Jetpack", teamIndex)
-                presEquipped  = presEquipped + #droppedJps * kJetpackCost
+                presEquipped = presEquipped + #droppedJps * kJetpackCost
                 -- Log("droppedJps %s", droppedJps)
                 local jper = GetEntitiesForTeam("JetpackMarine", teamIndex)
-                presEquipped  = presEquipped + #jper * kJetpackCost
+                presEquipped = presEquipped + #jper * kJetpackCost
                 -- Log("jper %s", jper)
 
                 local mines = GetEntitiesForTeam("Mine", teamIndex)
@@ -48,30 +85,30 @@ if Server then
                 presEquipped = presEquipped + #laymines * kMineCost
                 --  Log("laymines %s", laymines)
                 local welders = GetEntitiesForTeam("Welder", teamIndex)
-                presEquipped  = presEquipped + #welders * kWelderCost
+                presEquipped = presEquipped + #welders * kWelderCost
                 -- Log("welders %s", welders)
 
                 local shotguns = GetEntitiesForTeam("Shotgun", teamIndex)
-                presEquipped  = presEquipped + #shotguns * kShotgunCost
-                --Log("sgs %s", shotguns)
+                presEquipped = presEquipped + #shotguns * kShotgunCost
+                -- Log("sgs %s", shotguns)
                 local flamers = GetEntitiesForTeam("Flamethrower", teamIndex)
-                presEquipped  = presEquipped + #flamers * kFlamethrowerCost
-                --Log("fts %s", flamers)
+                presEquipped = presEquipped + #flamers * kFlamethrowerCost
+                -- Log("fts %s", flamers)
                 local mgs = GetEntitiesForTeam("HeavyMachineGun", teamIndex)
-                presEquipped  = presEquipped + #mgs * kHeavyMachineGunCost
-                --Log("mgs %s", mgs)
+                presEquipped = presEquipped + #mgs * kHeavyMachineGunCost
+                -- Log("mgs %s", mgs)
                 local gls = GetEntitiesForTeam("GrenadeLauncher", teamIndex)
-                presEquipped  = presEquipped + #gls * kGrenadeLauncherCost
-                --Log("gls %s", gls)
+                presEquipped = presEquipped + #gls * kGrenadeLauncherCost
+                -- Log("gls %s", gls)
 
                 local gasgrenades = GetEntitiesForTeam("GasGrenadeThrower", teamIndex)
-                presEquipped  = presEquipped + #gasgrenades * kGasGrenadeCost
+                presEquipped = presEquipped + #gasgrenades * kGasGrenadeCost
                 -- Log("gasgrenades %s", gasgrenades)
                 local pulsegrenades = GetEntitiesForTeam("PulseGrenadeThrower", teamIndex)
-                presEquipped  = presEquipped + #pulsegrenades * kPulseGrenadeCost
+                presEquipped = presEquipped + #pulsegrenades * kPulseGrenadeCost
                 -- Log("pulsegrenades %s", pulsegrenades)
                 local clustergrenades = GetEntitiesForTeam("ClusterGrenadeThrower", teamIndex)
-                presEquipped  = presEquipped + #clustergrenades * kClusterGrenadeCost
+                presEquipped = presEquipped + #clustergrenades * kClusterGrenadeCost
                 -- Log("clustergrenades %s", clustergrenades)
 
                 for count, player in pairs(team) do
@@ -81,11 +118,11 @@ if Server then
 
                         if player:GetHasRailgun() then
                             presEquipped = presEquipped + kDualRailgunExosuitCost
-                            --Log("+1 railgunexo")
+                            -- Log("+1 railgunexo")
                         end
                         if player:GetHasMinigun() then
                             presEquipped = presEquipped + kDualExosuitCost
-                        -- Log("+1 minigunexo")
+                            -- Log("+1 minigunexo")
                         end
                         if player.prevPlayerMapName == "jetpackmarine" then
                             presEquipped = presEquipped + kJetpackCost
@@ -110,11 +147,14 @@ if Server then
                     elseif player.previousMapName == "jetpackmarine" then
                         presEquipped = presEquipped + kJetpackCost
                     end
-
                 end
 
-                --Log("unused: %s, equipped: %s", presUnused, presEquipped)
-                STATSUI_PresGraphMarines(presUnused, presEquipped, currentRTs, playerCount)
+                -- Log("unused: %s, equipped: %s", presUnused, presEquipped)
+                if presUnused ~= marinePreUsed or presEquipped ~= marinePreEquipped then
+                    marinePreUsed = presUnused
+                    marinePreEquipped = presEquipped
+                    STATSUI_PresGraphMarines(roundNumber(presUnused, 0), roundNumber(presEquipped, 0), currentRTs, playerCount)
+                end
 
                 self.lastUpdatePresGraphMarine = self.timeSinceGameStateChanged
 
@@ -122,19 +162,16 @@ if Server then
                 if self.lastUpdatePresGraphMarine < 0.05 then
                     self.lastUpdatePresGraphMarine = 0.1 - kUpdateGraphInterval
                 end
-
             end
 
-
             if self.lastUpdatePresGraphAlien + kUpdateGraphInterval <= self.timeSinceGameStateChanged then
-
                 local teamIndex = 2
+                local currentRTs = 0
 
-                local teamInfo = GetEntitiesForTeam("TeamInfo", teamIndex)
-                if teamInfo and teamInfo[1] then
-                    local currentRTs = teamInfo[1]:GetNumResourceTowers()
-                else
-                    local currentRTs = 0
+                local teamInfo = GetTeamInfoEntity(teamIndex)
+                -- if teamInfo and teamInfo[1] then
+                if teamInfo then
+                    currentRTs = teamInfo:GetNumResourceTowers() or 0
                 end
 
                 local team = GetEntitiesForTeam("Player", teamIndex)
@@ -142,11 +179,10 @@ if Server then
                 local presEquipped = 0
                 local playerCount = 0
 
-
                 -- only gets normal eggs without players. Eggs with player inside are embryos
                 local eggs = GetEntitiesForTeam("Egg", teamIndex)
                 for i, egg in pairs(eggs) do
-                    --egg:GetGestateTechId() returns the lifeform which gets researched
+                    -- egg:GetGestateTechId() returns the lifeform which gets researched
                     local eggTechId = egg:GetTechId()
                     if eggTechId ~= kTechId.Egg then
                         if eggTechId == kTechId.GorgeEgg then
@@ -161,16 +197,14 @@ if Server then
                     end
                 end
 
-
                 for count, player in pairs(team) do
                     presUnused = presUnused + player:GetResources()
 
                     local upgradeAmount = #player:GetUpgrades()
 
-
                     if player:isa("Embryo") then
 
-                         -- get upgrades dont work on embryo
+                        -- get upgrades dont work on embryo
                         upgradeAmount = #player.evolvingUpgrades
                         local gestationTechId = player:GetGestationTechId()
 
@@ -206,31 +240,37 @@ if Server then
                         presEquipped = presEquipped + kOnosCost + kOnosUpgradeCost * upgradeAmount
                     end
 
-
                     if not player:isa("Commander") then
 
-                         -- used for counting how many players receive pres
-                         if player:GetResources() < 100  then
+                        -- used for counting how many players receive pres
+                        if player:GetResources() < 100 then
                             playerCount = playerCount + 1
                         end
 
                     end
                 end
 
-                --Log("unused: %s, equipped: %s", presUnused, presEquipped)
-                STATSUI_PresGraphAliens(presUnused, presEquipped, currentRTs, playerCount)
+                -- Log("unused: %s, equipped: %s", presUnused, presEquipped)
+                if presUnused ~= alienPreUsed or presEquipped ~= alienPreEquipped then
+                    alienPreUsed = presUnused
+                    alienPreEquipped = presEquipped
+                    STATSUI_PresGraphAliens(roundNumber(presUnused, 0), roundNumber(presEquipped, 0), currentRTs, playerCount)
+                end
+
                 self.lastUpdatePresGraphAlien = self.timeSinceGameStateChanged
 
-
-                 -- make sure to offset it by 0.1 once to be behind the kResourceTowerResourceInterval
-                 if self.lastUpdatePresGraphAlien < 0.05 then
+                -- make sure to offset it by 0.1 once to be behind the kResourceTowerResourceInterval
+                if self.lastUpdatePresGraphAlien < 0.05 then
                     self.lastUpdatePresGraphAlien = 0.1 - kUpdateGraphInterval
                 end
             end
-
         else
             self.lastUpdatePresGraphMarine = -100
             self.lastUpdatePresGraphAlien = -100
+            alienPreEquipped = -1
+            alienPreUsed = -1
+            marinePreEquipped = -1
+            marinePreUsed = -1
         end
     end
 end

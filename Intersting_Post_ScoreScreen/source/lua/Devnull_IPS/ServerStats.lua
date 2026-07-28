@@ -23,6 +23,8 @@ local STATS_BuildingSummary = {}
 local STATS_StartingTechPoints = {}
 local STATS_ExportResearch = {}
 local STATS_ExportBuilding = {}
+local STATS_PresGraphMarines = {}
+local STATS_PresGraphAliens = {}
 
 local STATS_remoteEndpoint = LoadConfigFile("RemoteStats.json")
 
@@ -32,92 +34,93 @@ local locationsLookup = {}
 local minimapExtents = {}
 
 local STATS_MarineCommanderSteamID
+local MAX_PAYLOAD_SIZE = 1024 -- max playload is 1024
 
 StatsUI_kLifecycle = enum({"Placed", "Built", "Destroyed", "Recycled", "Teleported"})
 
 local function dump(o)
-	if type(o) == "table" then
-		local s = "{ "
-		for k, v in pairs(o) do
-			if type(k) ~= "number" then
-				k = '"' .. k .. '"'
-			end
-			s = s .. "[" .. k .. "] = " .. dump(v) .. ","
-		end
-		return s .. "} "
-	else
-		return tostring(o)
-	end
+    if type(o) == "table" then
+        local s = "{ "
+        for k, v in pairs(o) do
+            if type(k) ~= "number" then
+                k = '"' .. k .. '"'
+            end
+            s = s .. "[" .. k .. "] = " .. dump(v) .. ","
+        end
+        return s .. "} "
+    else
+        return tostring(o)
+    end
 end
 
 local function round(number, decimals)
-	if number and IsNumber(number) then
-		if decimals > 0 then
-			decimals = 10 ^ decimals
-			number = number * decimals
-			number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
-			number = number / decimals
-		else
-			number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
-		end
+    if number and IsNumber(number) then
+        if decimals > 0 then
+            decimals = 10 ^ decimals
+            number = number * decimals
+            number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
+            number = number / decimals
+        else
+            number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
+        end
 
-		return tostring(number)
-	else
-		return "NaN"
-	end
+        return tostring(number)
+    else
+        return "NaN"
+    end
 end
 
 local function roundNumber(number, decimals)
-	if number and IsNumber(number) then
-		if decimals > 0 then
-			decimals = 10 ^ decimals
-			number = number * decimals
-			number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
-			number = number / decimals
-		else
-			number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
-		end
+    if number and IsNumber(number) then
+        if decimals > 0 then
+            decimals = 10 ^ decimals
+            number = number * decimals
+            number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
+            number = number / decimals
+        else
+            number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
+        end
 
-		return number
-	else
-		return 0
-	end
+        return number
+    else
+        return 0
+    end
 end
 
 local function enumContainElement(enum, element)
-	for _, v in pairs(enum) do
-		if _ == element then
-			return true
-		end
-	end
-	return false
+    for _, v in pairs(enum) do
+        if _ == element then
+            return true
+        end
+    end
+    return false
 end
 
 local function manipulateVariables()
-	if enumContainElement(kTechId, "Prowler") then
-		stringToTechID["Prowler"] = kTechId.Prowler
-		stringToTechID["ProwlerEgg"] = kTechId.Prowler
-	end
+    if enumContainElement(kTechId, "Prowler") then
+        stringToTechID["Prowler"] = kTechId.Prowler
+        stringToTechID["ProwlerEgg"] = kTechId.Prowler
+    end
 end
 
 function StatsUI_SetMarineCommmaderSteamID(steamId)
-	STATS_MarineCommanderSteamID = steamId or 0
+    STATS_MarineCommanderSteamID = steamId or 0
 end
 
 function StatsUI_GetMarineCommmaderSteamID()
-	return STATS_MarineCommanderSteamID or 0
+    return STATS_MarineCommanderSteamID or 0
 end
 
 local function OnMapLoadEntity(className, _, values)
-	if className == "minimap_extents" then
-		minimapExtents.scale = tostring(values.scale)
-		minimapExtents.origin = tostring(values.origin)
-	elseif className == "location" and values.name and values.name ~= "" then
-		if not locationsLookup[values.name] then
-			locationsLookup[values.name] = #locationsTable + 1
-			table.insert(locationsTable, values.name)
-		end
-	end
+    if className == "minimap_extents" then
+        minimapExtents.scale = tostring(values.scale)
+        minimapExtents.origin = tostring(values.origin)
+    elseif className == "location" and values.name and values.name ~= "" then
+        if not locationsLookup[values.name] then
+            locationsLookup[values.name] = #locationsTable + 1
+            table.insert(locationsTable, values.name)
+        end
+    end
 end
 Event.Hook("MapLoadEntity", OnMapLoadEntity)
 
@@ -125,7 +128,9 @@ local function GetGameTime(inMinutes)
     -- Cache the gamerules result to avoid multiple function calls
     local gamerules = GetGamerules()
     -- Early return if no gamerules exist
-    if not gamerules then return nil end
+    if not gamerules then
+        return nil
+    end
 
     -- Get the time directly
     local gameTime = gamerules:GetGameTimeChanged()
@@ -138,427 +143,385 @@ local function GetGameTime(inMinutes)
     return gameTime
 end
 
-
 function StatsUI_AddExportBuilding(teamNumber, techId, entityId, location, lifecycle, isBuilt, extraInfo)
-	table.insert(
-		STATS_ExportBuilding,
-		{
-			teamNumber = teamNumber,
-			techId = EnumToString(kTechId, techId),
-			entityId = entityId,
-			gameTime = GetGameTime(),
-			built = isBuilt,
-			destroyed = lifecycle == StatsUI_kLifecycle.Destroyed or lifecycle == StatsUI_kLifecycle.Recycled,
-			recycled = lifecycle == StatsUI_kLifecycle.Recycled,
-			event = EnumToString(StatsUI_kLifecycle, lifecycle),
-			location = tostring(location)
-		}
-	)
+    table.insert(STATS_ExportBuilding, {
+        teamNumber = teamNumber,
+        techId = EnumToString(kTechId, techId),
+        entityId = entityId,
+        gameTime = GetGameTime(),
+        built = isBuilt,
+        destroyed = lifecycle == StatsUI_kLifecycle.Destroyed or lifecycle == StatsUI_kLifecycle.Recycled,
+        recycled = lifecycle == StatsUI_kLifecycle.Recycled,
+        event = EnumToString(StatsUI_kLifecycle, lifecycle),
+        location = tostring(location)
+    })
 
-	if extraInfo then
-		STATS_ExportBuilding[#STATS_ExportBuilding][extraInfo.name] = extraInfo.value
-	end
+    if extraInfo then
+        STATS_ExportBuilding[#STATS_ExportBuilding][extraInfo.name] = extraInfo.value
+    end
 end
 
 function StatsUI_AddRTStat(teamNumber, built, destroyed)
-	if teamNumber == 1 or teamNumber == 2 then
-		local rtsTable = STATS_TeamStats[teamNumber].rts
-		local finishedBuilding = built and not destroyed
+    if teamNumber == 1 or teamNumber == 2 then
+        local rtsTable = STATS_TeamStats[teamNumber].rts
+        local finishedBuilding = built and not destroyed
 
-		if built then
-			table.insert(
-				STATS_RTGraph,
-				{
-					teamNumber = teamNumber,
-					destroyed = destroyed,
-					gameMinute = GetGameTime(true)
-				}
-			)
-		end
+        if built then
+            table.insert(STATS_RTGraph, {
+                teamNumber = teamNumber,
+                destroyed = destroyed,
+                gameMinute = GetGameTime(true)
+            })
+        end
 
-		-- The unfinished nodes will be computed on the overall built/lost data
-		rtsTable.lost = rtsTable.lost + ConditionalValue(destroyed, 1, 0)
-		rtsTable.built = rtsTable.built + ConditionalValue(finishedBuilding, 1, 0)
-	end
+        -- The unfinished nodes will be computed on the overall built/lost data
+        rtsTable.lost = rtsTable.lost + ConditionalValue(destroyed, 1, 0)
+        rtsTable.built = rtsTable.built + ConditionalValue(finishedBuilding, 1, 0)
+    end
 end
 
 function StatsUI_AddTechStat(teamNumber, techId, built, destroyed, recycled)
-	if (teamNumber == 1 or teamNumber == 2) and techId then
-		local teamInfoEnt = GetTeamInfoEntity(teamNumber)
+    if (teamNumber == 1 or teamNumber == 2) and techId then
+        local teamInfoEnt = GetTeamInfoEntity(teamNumber)
 
-		-- Advanced armory displays both "Upgrade to advanced armory" and "Advanced weaponry", filter one
-		if techId ~= kTechId.AdvancedWeaponry then
-			table.insert(
-				STATS_ResearchTree,
-				{
-					teamNumber = teamNumber,
-					techId = techId,
-					finishedMinute = GetGameTime(true),
-					activeRTs = teamInfoEnt:GetNumResourceTowers(),
-					teamRes = teamInfoEnt:GetTeamResources(),
-					destroyed = destroyed,
-					built = built,
-					recycled = recycled
-				}
-			)
-		end
-	end
+        -- Advanced armory displays both "Upgrade to advanced armory" and "Advanced weaponry", filter one
+        if techId ~= kTechId.AdvancedWeaponry then
+            table.insert(STATS_ResearchTree, {
+                teamNumber = teamNumber,
+                techId = techId,
+                finishedMinute = GetGameTime(true),
+                activeRTs = teamInfoEnt:GetNumResourceTowers(),
+                teamRes = teamInfoEnt:GetTeamResources(),
+                destroyed = destroyed,
+                built = built,
+                recycled = recycled
+            })
+        end
+    end
 end
 
 function StatsUI_AddBuildingStat(teamNumber, techId, lost)
-	if (teamNumber == 1 or teamNumber == 2) and techId then
-		if techId == kTechId.DrifterEgg then
-			techId = kTechId.Drifter
-		elseif techId == kTechId.ARCRoboticsFactory then
-			techId = kTechId.RoboticsFactory
-		elseif techId == kTechId.AdvancedArmory then
-			techId = kTechId.Armory
-		elseif techId == kTechId.CragHive then
-			techId = kTechId.Hive
-		elseif techId == kTechId.ShiftHive then
-			techId = kTechId.Hive
-		elseif techId == kTechId.ShadeHive then
-			techId = kTechId.Hive
-		end
+    if (teamNumber == 1 or teamNumber == 2) and techId then
+        if techId == kTechId.DrifterEgg then
+            techId = kTechId.Drifter
+        elseif techId == kTechId.ARCRoboticsFactory then
+            techId = kTechId.RoboticsFactory
+        elseif techId == kTechId.AdvancedArmory then
+            techId = kTechId.Armory
+        elseif techId == kTechId.CragHive then
+            techId = kTechId.Hive
+        elseif techId == kTechId.ShiftHive then
+            techId = kTechId.Hive
+        elseif techId == kTechId.ShadeHive then
+            techId = kTechId.Hive
+        end
 
-		local stat = STATS_BuildingSummary[teamNumber][techId]
-		if not stat then
-			STATS_BuildingSummary[teamNumber][techId] = {}
-			STATS_BuildingSummary[teamNumber][techId].built = 0
-			STATS_BuildingSummary[teamNumber][techId].lost = 0
-			stat = STATS_BuildingSummary[teamNumber][techId]
-		end
+        local stat = STATS_BuildingSummary[teamNumber][techId]
+        if not stat then
+            STATS_BuildingSummary[teamNumber][techId] = {}
+            STATS_BuildingSummary[teamNumber][techId].built = 0
+            STATS_BuildingSummary[teamNumber][techId].lost = 0
+            stat = STATS_BuildingSummary[teamNumber][techId]
+        end
 
-		if lost then
-			stat.lost = stat.lost + 1
-		else
-			stat.built = stat.built + 1
-		end
-	end
+        if lost then
+            stat.lost = stat.lost + 1
+        else
+            stat.built = stat.built + 1
+        end
+    end
 end
 
-local notLoggedBuildings =
-	set {
-	"PowerPoint",
-	"Hydra",
-	"Clog",
-	"Web",
-	"Babbler",
-	"BabblerEgg",
-	"Egg",
-	"BoneWall",
-	"Hallucination",
-	"Mine"
-}
+local notLoggedBuildings = set {"PowerPoint", "Hydra", "Clog", "Web", "Babbler", "BabblerEgg", "Egg", "BoneWall", "Hallucination", "Mine"}
 
 function StatsUI_GetBuildingBlockedFromLog(structureName)
-	return notLoggedBuildings[structureName]
+    return notLoggedBuildings[structureName]
 end
 
 local techLoggedAsBuilding = set {kTechId.ARC, kTechId.MAC, kTechId.Drifter}
 
 function StatsUI_GetTechLoggedAsBuilding(techId)
-	return techLoggedAsBuilding[techId]
+    return techLoggedAsBuilding[techId]
 end
 
-local techLogBuildings =
-	set {
-	"ArmsLab",
-	"PrototypeLab",
-	"Observatory",
-	"InfantryPortal",
-	"CommandStation",
-	"Veil",
-	"Shell",
-	"Spur",
-	"Hive"
-}
+local techLogBuildings = set {"ArmsLab", "PrototypeLab", "Observatory", "InfantryPortal", "CommandStation", "Veil", "Shell", "Spur", "Hive"}
 
 function StatsUI_GetBuildingLogged(structureName)
-	return techLogBuildings[structureName]
+    return techLogBuildings[structureName]
 end
 
 function StatsUI_AddExportResearch(teamNumber, researchIdString)
-	table.insert(
-		STATS_ExportResearch,
-		{
-			teamNumber = teamNumber,
-			researchId = researchIdString,
-			gameTime = GetGameTime()
-		}
-	)
+    table.insert(STATS_ExportResearch, {
+        teamNumber = teamNumber,
+        researchId = researchIdString,
+        gameTime = GetGameTime()
+    })
 end
 
 function StatsUI_AddHiveSkillEntry(player, teamNumber, joined)
-	local gamerules = GetGamerules()
-	local steamId = player:GetSteamId()
-	local isOnPlayingTeam = teamNumber == kTeam1Index or teamNumber == kTeam2Index -- don't track spectators
+    local gamerules = GetGamerules()
+    local steamId = player:GetSteamId()
+    local isOnPlayingTeam = teamNumber == kTeam1Index or teamNumber == kTeam2Index -- don't track spectators
 
-	if gamerules and isOnPlayingTeam and steamId > 0 then -- don't track bots
-		STATS_TeamStats[1].maxPlayers = math.max(STATS_TeamStats[1].maxPlayers, gamerules.team1:GetNumPlayers())
-		STATS_TeamStats[2].maxPlayers = math.max(STATS_TeamStats[2].maxPlayers, gamerules.team2:GetNumPlayers())
+    if gamerules and isOnPlayingTeam and steamId > 0 then -- don't track bots
+        STATS_TeamStats[1].maxPlayers = math.max(STATS_TeamStats[1].maxPlayers, gamerules.team1:GetNumPlayers())
+        STATS_TeamStats[2].maxPlayers = math.max(STATS_TeamStats[2].maxPlayers, gamerules.team2:GetNumPlayers())
 
-		local gameTime = GetGameTime(true)
-		table.insert(
-			STATS_HiveSkillGraph,
-			{
-				gameMinute = gameTime,
-				joined = joined,
-				teamNumber = teamNumber,
-				steamId = steamId
-			}
-		)
-	end
+        local gameTime = GetGameTime(true)
+        table.insert(STATS_HiveSkillGraph, {
+            gameMinute = gameTime,
+            joined = joined,
+            teamNumber = teamNumber,
+            steamId = steamId
+        })
+    end
 end
 
 function StatsUI_ResetLastLifeStats(steamId)
-	if steamId > 0 and STATS_ClientStats[steamId] then
-		STATS_ClientStats[steamId]["last"] = {}
-		STATS_ClientStats[steamId]["last"].pdmg = 0
-		STATS_ClientStats[steamId]["last"].sdmg = 0
-		STATS_ClientStats[steamId]["last"].hits = 0
-		STATS_ClientStats[steamId]["last"].onosHits = 0
-		STATS_ClientStats[steamId]["last"].misses = 0
-		STATS_ClientStats[steamId]["last"].kills = 0
-		STATS_ClientStats[steamId]["last"].medsReceived = 0
-		STATS_ClientStats[steamId]["last"].parasites = 0
-		STATS_ClientStats[steamId]["last"].marineRtDamage = 0
-		STATS_ClientStats[steamId]["last"].alienRtDamage = 0
-		STATS_ClientStats[steamId]["last"].aliveFor = Shared.GetTime()
-		STATS_ClientStats[steamId]["last"].mapCheck = 0
-	end
+    if steamId > 0 and STATS_ClientStats[steamId] then
+        STATS_ClientStats[steamId]["last"] = {}
+        STATS_ClientStats[steamId]["last"].pdmg = 0
+        STATS_ClientStats[steamId]["last"].sdmg = 0
+        STATS_ClientStats[steamId]["last"].hits = 0
+        STATS_ClientStats[steamId]["last"].onosHits = 0
+        STATS_ClientStats[steamId]["last"].misses = 0
+        STATS_ClientStats[steamId]["last"].kills = 0
+        STATS_ClientStats[steamId]["last"].medsReceived = 0
+        STATS_ClientStats[steamId]["last"].parasites = 0
+        STATS_ClientStats[steamId]["last"].marineRtDamage = 0
+        STATS_ClientStats[steamId]["last"].alienRtDamage = 0
+        STATS_ClientStats[steamId]["last"].aliveFor = Shared.GetTime()
+        STATS_ClientStats[steamId]["last"].mapCheck = 0
+    end
 end
 
 -- Function name 2 stronk
 function StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
-	if steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
-		if not STATS_ClientStats[steamId] then
-			STATS_ClientStats[steamId] = {}
-			STATS_ClientStats[steamId][1] = {}
-			STATS_ClientStats[steamId][2] = {}
-			for _, entry in ipairs(STATS_ClientStats[steamId]) do
-				entry.kills = 0
-				entry.assists = 0
-				entry.deaths = 0
-				entry.score = 0
-				entry.pdmg = 0
-				entry.sdmg = 0
-				entry.hits = 0
-				entry.onosHits = 0
-				entry.misses = 0
-				entry.killstreak = 0
-				entry.timeBuilding = 0
-				entry.timePlayed = 0
-				entry.commanderTime = 0
-				entry.timeMapCheck = 0
-			end
+    if steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
+        if not STATS_ClientStats[steamId] then
+            STATS_ClientStats[steamId] = {}
+            STATS_ClientStats[steamId][1] = {}
+            STATS_ClientStats[steamId][2] = {}
+            for _, entry in ipairs(STATS_ClientStats[steamId]) do
+                entry.kills = 0
+                entry.assists = 0
+                entry.deaths = 0
+                entry.score = 0
+                entry.pdmg = 0
+                entry.sdmg = 0
+                entry.hits = 0
+                entry.onosHits = 0
+                entry.misses = 0
+                entry.killstreak = 0
+                entry.timeBuilding = 0
+                entry.timePlayed = 0
+                entry.commanderTime = 0
+                entry.timeMapCheck = 0
+            end
 
-			-- These are team independent
-			STATS_ClientStats[steamId].playerName = "NSPlayer"
-			STATS_ClientStats[steamId].hiveSkill = -1
-			STATS_ClientStats[steamId].playerSkillOffset = -1
-			STATS_ClientStats[steamId].commanderSkill = -1
-			STATS_ClientStats[steamId].commanderSkillOffset = -1
-			STATS_ClientStats[steamId].adagrad = -1
-			STATS_ClientStats[steamId].isRookie = false
-			STATS_ClientStats[steamId].lastTeam = teamNumber
+            -- These are team independent
+            STATS_ClientStats[steamId].playerName = "NSPlayer"
+            STATS_ClientStats[steamId].hiveSkill = -1
+            STATS_ClientStats[steamId].playerSkillOffset = -1
+            STATS_ClientStats[steamId].commanderSkill = -1
+            STATS_ClientStats[steamId].commanderSkillOffset = -1
+            STATS_ClientStats[steamId].adagrad = -1
+            STATS_ClientStats[steamId].isRookie = false
+            STATS_ClientStats[steamId].lastTeam = teamNumber
 
-			-- Initialize the last life stats
-			StatsUI_ResetLastLifeStats(steamId)
+            -- Initialize the last life stats
+            StatsUI_ResetLastLifeStats(steamId)
 
-			STATS_ClientStats[steamId]["weapons"] = {}
-			STATS_ClientStats[steamId]["status"] = {}
-		elseif (teamNumber ~= nil and STATS_ClientStats[steamId].lastTeam ~= teamNumber) then
-			STATS_ClientStats[steamId].lastTeam = teamNumber
+            STATS_ClientStats[steamId]["weapons"] = {}
+            STATS_ClientStats[steamId]["status"] = {}
+        elseif (teamNumber ~= nil and STATS_ClientStats[steamId].lastTeam ~= teamNumber) then
+            STATS_ClientStats[steamId].lastTeam = teamNumber
 
-			-- Clear the last life stats if the player switches teams
-			StatsUI_ResetLastLifeStats(steamId)
-		end
+            -- Clear the last life stats if the player switches teams
+            StatsUI_ResetLastLifeStats(steamId)
+        end
 
-		if wTechId and not STATS_ClientStats[steamId]["weapons"][wTechId] and (teamNumber == 1 or teamNumber == 2) then
-			STATS_ClientStats[steamId]["weapons"][wTechId] = {}
-			STATS_ClientStats[steamId]["weapons"][wTechId].hits = 0
-			STATS_ClientStats[steamId]["weapons"][wTechId].onosHits = 0
-			STATS_ClientStats[steamId]["weapons"][wTechId].misses = 0
-			STATS_ClientStats[steamId]["weapons"][wTechId].kills = 0
-			STATS_ClientStats[steamId]["weapons"][wTechId].pdmg = 0
-			STATS_ClientStats[steamId]["weapons"][wTechId].sdmg = 0
-			STATS_ClientStats[steamId]["weapons"][wTechId].teamNumber = teamNumber
-		end
-	end
+        if wTechId and not STATS_ClientStats[steamId]["weapons"][wTechId] and (teamNumber == 1 or teamNumber == 2) then
+            STATS_ClientStats[steamId]["weapons"][wTechId] = {}
+            STATS_ClientStats[steamId]["weapons"][wTechId].hits = 0
+            STATS_ClientStats[steamId]["weapons"][wTechId].onosHits = 0
+            STATS_ClientStats[steamId]["weapons"][wTechId].misses = 0
+            STATS_ClientStats[steamId]["weapons"][wTechId].kills = 0
+            STATS_ClientStats[steamId]["weapons"][wTechId].pdmg = 0
+            STATS_ClientStats[steamId]["weapons"][wTechId].sdmg = 0
+            STATS_ClientStats[steamId]["weapons"][wTechId].teamNumber = teamNumber
+        end
+    end
 end
 
 function StatsUI_AddAccuracyStat(steamId, wTechId, wasHit, isOnos, teamNumber)
-	if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
-		StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
+    if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
+        StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
 
-		if STATS_ClientStats[steamId] then
-			local overallStat = STATS_ClientStats[steamId][teamNumber]
-			local stat = STATS_ClientStats[steamId]["weapons"][wTechId]
-			local lastStat = STATS_ClientStats[steamId]["last"]
+        if STATS_ClientStats[steamId] then
+            local overallStat = STATS_ClientStats[steamId][teamNumber]
+            local stat = STATS_ClientStats[steamId]["weapons"][wTechId]
+            local lastStat = STATS_ClientStats[steamId]["last"]
 
-			if wasHit then
-				overallStat.hits = overallStat.hits + 1
-				stat.hits = stat.hits + 1
-				lastStat.hits = lastStat.hits + 1
+            if wasHit then
+                overallStat.hits = overallStat.hits + 1
+                stat.hits = stat.hits + 1
+                lastStat.hits = lastStat.hits + 1
 
-				if teamNumber == 1 or teamNumber == 2 then
-					STATS_TeamStats[teamNumber].hits = STATS_TeamStats[teamNumber].hits + 1
-				end
+                if teamNumber == 1 or teamNumber == 2 then
+                    STATS_TeamStats[teamNumber].hits = STATS_TeamStats[teamNumber].hits + 1
+                end
 
-				if isOnos then
-					overallStat.onosHits = overallStat.onosHits + 1
-					stat.onosHits = stat.onosHits + 1
-					lastStat.onosHits = lastStat.onosHits + 1
+                if isOnos then
+                    overallStat.onosHits = overallStat.onosHits + 1
+                    stat.onosHits = stat.onosHits + 1
+                    lastStat.onosHits = lastStat.onosHits + 1
 
-					if teamNumber == 1 then
-						STATS_TeamStats[1].onosHits = STATS_TeamStats[1].onosHits + 1
-					end
-				end
-			else
-				overallStat.misses = overallStat.misses + 1
-				stat.misses = stat.misses + 1
-				lastStat.misses = lastStat.misses + 1
+                    if teamNumber == 1 then
+                        STATS_TeamStats[1].onosHits = STATS_TeamStats[1].onosHits + 1
+                    end
+                end
+            else
+                overallStat.misses = overallStat.misses + 1
+                stat.misses = stat.misses + 1
+                lastStat.misses = lastStat.misses + 1
 
-				if teamNumber == 1 or teamNumber == 2 then
-					STATS_TeamStats[teamNumber].misses = STATS_TeamStats[teamNumber].misses + 1
-				end
-			end
-		end
-	end
+                if teamNumber == 1 or teamNumber == 2 then
+                    STATS_TeamStats[teamNumber].misses = STATS_TeamStats[teamNumber].misses + 1
+                end
+            end
+        end
+    end
 end
 
 function StatsUI_AddDamageStat(steamId, damage, isPlayer, wTechId, teamNumber)
-	if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
-		StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
+    if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
+        StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
 
-		if STATS_ClientStats[steamId] then
-			local stat = STATS_ClientStats[steamId][teamNumber]
-			local weaponStat = STATS_ClientStats[steamId]["weapons"][wTechId]
-			local lastStat = STATS_ClientStats[steamId]["last"]
+        if STATS_ClientStats[steamId] then
+            local stat = STATS_ClientStats[steamId][teamNumber]
+            local weaponStat = STATS_ClientStats[steamId]["weapons"][wTechId]
+            local lastStat = STATS_ClientStats[steamId]["last"]
 
-			if isPlayer then
-				stat.pdmg = (stat.pdmg or 0) + damage
-				weaponStat.pdmg = (weaponStat.pdmg or 0) + damage
-				lastStat.pdmg = (lastStat.pdmg or 0) + damage
-			else
-				stat.sdmg = (stat.sdmg or 0) + damage
-				weaponStat.sdmg = (weaponStat.sdmg or 0) + damage
-				lastStat.sdmg = (lastStat.sdmg or 0) + damage
-			end
-		end
-	end
+            if isPlayer then
+                stat.pdmg = (stat.pdmg or 0) + damage
+                weaponStat.pdmg = (weaponStat.pdmg or 0) + damage
+                lastStat.pdmg = (lastStat.pdmg or 0) + damage
+            else
+                stat.sdmg = (stat.sdmg or 0) + damage
+                weaponStat.sdmg = (weaponStat.sdmg or 0) + damage
+                lastStat.sdmg = (lastStat.sdmg or 0) + damage
+            end
+        end
+    end
 end
 
 function StatsUI_AddWeaponKill(steamId, wTechId, teamNumber)
-	if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
-		StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
+    if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
+        StatsUI_MaybeInitClientStats(steamId, wTechId, teamNumber)
 
-		if STATS_ClientStats[steamId] then
-			local rootStat = STATS_ClientStats[steamId][teamNumber]
-			local weaponStat = STATS_ClientStats[steamId]["weapons"][wTechId]
-			local lastStat = STATS_ClientStats[steamId]["last"]
+        if STATS_ClientStats[steamId] then
+            local rootStat = STATS_ClientStats[steamId][teamNumber]
+            local weaponStat = STATS_ClientStats[steamId]["weapons"][wTechId]
+            local lastStat = STATS_ClientStats[steamId]["last"]
 
-			weaponStat.kills = weaponStat.kills + 1
-			lastStat.kills = lastStat.kills + 1
+            weaponStat.kills = weaponStat.kills + 1
+            lastStat.kills = lastStat.kills + 1
 
-			if lastStat.kills > rootStat.killstreak then
-				rootStat.killstreak = lastStat.kills
-			end
-		end
-	end
+            if lastStat.kills > rootStat.killstreak then
+                rootStat.killstreak = lastStat.kills
+            end
+        end
+    end
 end
 
 function StatsUI_AddTeamGraphKill(teamNumber, killer, victim, weapon, doer)
-	if teamNumber == 1 or teamNumber == 2 then
-		local killerLocation = killer and killer:isa("Player") and locationsLookup[killer:GetLocationName()] or nil
-		local killerPosition = killer and killer:isa("Player") and tostring(killer:GetOrigin()) or nil
-		local killerClass = killer and killer:isa("Player") and EnumToString(kPlayerStatus, killer:GetPlayerStatusDesc()) or nil
+    if teamNumber == 1 or teamNumber == 2 then
+        local killerLocation = killer and killer:isa("Player") and locationsLookup[killer:GetLocationName()] or nil
+        local killerPosition = killer and killer:isa("Player") and tostring(killer:GetOrigin()) or nil
+        local killerClass = killer and killer:isa("Player") and EnumToString(kPlayerStatus, killer:GetPlayerStatusDesc()) or nil
 
-		if not killerClass and doer and doer.GetClassName then
-			killerClass = doer:GetClassName()
-		end
+        if not killerClass and doer and doer.GetClassName then
+            killerClass = doer:GetClassName()
+        end
 
-		local doerLocation, doerPosition
+        local doerLocation, doerPosition
 
-		if doer and doer:isa("WhipBomb") and doer.shooter then
-			doer = doer.shooter
-		end
+        if doer and doer:isa("WhipBomb") and doer.shooter then
+            doer = doer.shooter
+        end
 
-		-- Don't log doerLocation/Position for weapons that have parents (rifle, bite, etc)
-		-- These are meant for things like mines, grenades, etc
-		if doer and doer.GetParent and doer:GetParent() == nil then
-			local origin = doer.GetOrigin and doer:GetOrigin()
+        -- Don't log doerLocation/Position for weapons that have parents (rifle, bite, etc)
+        -- These are meant for things like mines, grenades, etc
+        if doer and doer.GetParent and doer:GetParent() == nil then
+            local origin = doer.GetOrigin and doer:GetOrigin()
 
-			if origin then
-				local location = GetLocationForPoint(origin)
-				doerLocation = locationsLookup[location and location:GetName()]
-				doerPosition = tostring(origin)
-			end
-		end
+            if origin then
+                local location = GetLocationForPoint(origin)
+                doerLocation = locationsLookup[location and location:GetName()]
+                doerPosition = tostring(origin)
+            end
+        end
 
-		local killerSteamID = killer and killer:isa("Player") and killer:GetSteamId() or nil
-		local victimLocation = victim and victim:isa("Player") and locationsLookup[victim:GetLocationName()] or nil
-		local victimPosition = victim and victim:isa("Player") and tostring(victim:GetOrigin()) or nil
-		local victimClass = victim and victim:isa("Player") and EnumToString(kPlayerStatus, victim:GetPlayerStatusDesc()) or nil
-		local victimSteamID = victim and victim:isa("Player") and victim:GetSteamId() or nil
-		weapon = EnumToString(kTechId, weapon) or nil
+        local killerSteamID = killer and killer:isa("Player") and killer:GetSteamId() or nil
+        local victimLocation = victim and victim:isa("Player") and locationsLookup[victim:GetLocationName()] or nil
+        local victimPosition = victim and victim:isa("Player") and tostring(victim:GetOrigin()) or nil
+        local victimClass = victim and victim:isa("Player") and EnumToString(kPlayerStatus, victim:GetPlayerStatusDesc()) or nil
+        local victimSteamID = victim and victim:isa("Player") and victim:GetSteamId() or nil
+        weapon = EnumToString(kTechId, weapon) or nil
 
-		table.insert(
-			STATS_KillGraph,
-			{
-				gameTime = GetGameTime(),
-				gameMinute = GetGameTime(true),
-				killerTeamNumber = teamNumber,
-				killerWeapon = weapon,
-				killerPosition = killerPosition,
-				killerLocation = killerLocation,
-				killerClass = killerClass,
-				killerSteamID = killerSteamID,
-				victimPosition = victimPosition,
-				victimLocation = victimLocation,
-				victimClass = victimClass,
-				victimSteamID = victimSteamID,
-				doerLocation = doerLocation,
-				doerPosition = doerPosition
-			}
-		)
-	-- print("Got a kill...: " .. tostring(killerClass) .. " -> " .. tostring(victimClass))
-	end
+        table.insert(STATS_KillGraph, {
+            gameTime = GetGameTime(),
+            gameMinute = GetGameTime(true),
+            killerTeamNumber = teamNumber,
+            killerWeapon = weapon,
+            killerPosition = killerPosition,
+            killerLocation = killerLocation,
+            killerClass = killerClass,
+            killerSteamID = killerSteamID,
+            victimPosition = victimPosition,
+            victimLocation = victimLocation,
+            victimClass = victimClass,
+            victimSteamID = victimSteamID,
+            doerLocation = doerLocation,
+            doerPosition = doerPosition
+        })
+        -- print("Got a kill...: " .. tostring(killerClass) .. " -> " .. tostring(victimClass))
+    end
 end
 
 function StatsUI_AddBuildTime(steamId, buildTime, teamNumber)
-	if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
-		StatsUI_MaybeInitClientStats(steamId, nil, teamNumber)
+    if GetGamerules():GetGameStarted() and steamId > 0 and (teamNumber == 1 or teamNumber == 2) then
+        StatsUI_MaybeInitClientStats(steamId, nil, teamNumber)
 
-		if STATS_ClientStats[steamId] then
-			local stat = STATS_ClientStats[steamId][teamNumber]
-			stat.timeBuilding = stat.timeBuilding + buildTime
-		end
-	end
+        if STATS_ClientStats[steamId] then
+            local stat = STATS_ClientStats[steamId][teamNumber]
+            stat.timeBuilding = stat.timeBuilding + buildTime
+        end
+    end
 end
 
 function StatsUI_AddMapCheckTime(client, message)
-	--print("Received mapCheckTime " .. tostring(type(client)) .. " "..ToString(client) .. " " .. tostring(client.classname) .. " / time " .. tostring(message.mapCheckTime) .. " team no " .. tostring(message.teamNumber))
-	local player = client:GetControllingPlayer()
-	local steamId = 0
-	if player then
-		steamId = player:GetSteamId()
-	end
-	if steamId > 0 and GetGamerules():GetGameStarted()  and (message.teamNumber == 1 or message.teamNumber == 2) then
-		StatsUI_MaybeInitClientStats(steamId, nil, message.teamNumber)
-		
-		local mapCheckTimeValidated = message.mapCheckTime
-		if GetGameTime() < mapCheckTimeValidated then
-			--print("Time had to be validated " .. tostring(GetGameTime()) .. " vs " .. tostring(mapCheckTimeValidated))
-			mapCheckTimeValidated = GetGameTime()
-		end
-		if STATS_ClientStats[steamId] then
-			local stat = STATS_ClientStats[steamId][message.teamNumber]
-			--print("Adding time " .. tostring(stat.timeMapCheck) .. " + " .. tostring(message.mapCheckTime) ..  " = " .. tostring(stat.timeMapCheck + mapCheckTimeValidated))
-			stat.timeMapCheck = stat.timeMapCheck + mapCheckTimeValidated
-		end
-	end
+    -- print("Received mapCheckTime " .. tostring(type(client)) .. " "..ToString(client) .. " " .. tostring(client.classname) .. " / time " .. tostring(message.mapCheckTime) .. " team no " .. tostring(message.teamNumber))
+    local player = client:GetControllingPlayer()
+    local steamId = 0
+    if player then
+        steamId = player:GetSteamId()
+    end
+    if steamId > 0 and GetGamerules():GetGameStarted() and (message.teamNumber == 1 or message.teamNumber == 2) then
+        StatsUI_MaybeInitClientStats(steamId, nil, message.teamNumber)
+
+        local mapCheckTimeValidated = message.mapCheckTime
+        if GetGameTime() < mapCheckTimeValidated then
+            -- print("Time had to be validated " .. tostring(GetGameTime()) .. " vs " .. tostring(mapCheckTimeValidated))
+            mapCheckTimeValidated = GetGameTime()
+        end
+        if STATS_ClientStats[steamId] then
+            local stat = STATS_ClientStats[steamId][message.teamNumber]
+            -- print("Adding time " .. tostring(stat.timeMapCheck) .. " + " .. tostring(message.mapCheckTime) ..  " = " .. tostring(stat.timeMapCheck + mapCheckTimeValidated))
+            stat.timeMapCheck = stat.timeMapCheck + mapCheckTimeValidated
+        end
+    end
 end
 
 Server.HookNetworkMessage("mapCheckTime", StatsUI_AddMapCheckTime)
@@ -583,73 +546,73 @@ stringToTechID["Onos"] = kTechId.Onos
 stringToTechID["OnosEgg"] = kTechId.Onos
 
 function StatsUI_GetAttackerWeapon(attacker, doer)
-	local attackerTeam = attacker and attacker:isa("Player") and attacker:GetTeamNumber() or nil
-	local attackerSteamId = attacker and attacker:isa("Player") and attacker:GetSteamId() or nil
-	local attackerWeapon = doer and doer:isa("Weapon") and doer:GetTechId() or kTechId.None
+    local attackerTeam = attacker and attacker:isa("Player") and attacker:GetTeamNumber() or nil
+    local attackerSteamId = attacker and attacker:isa("Player") and attacker:GetSteamId() or nil
+    local attackerWeapon = doer and doer:isa("Weapon") and doer:GetTechId() or kTechId.None
 
-	if attacker and doer then
-		if doer.GetClassName and classNameToTechId[doer:GetClassName()] then
-			attackerWeapon = classNameToTechId[doer:GetClassName()]
-		elseif doer:GetParent() and doer:GetParent():isa("Player") then
-			if attacker:isa("Alien") and ((attacker:isa("Gorge") and doer.secondaryAttacking) or doer.shootingSpikes) then
-				attackerWeapon = attacker:GetActiveWeapon():GetSecondaryTechId()
-			else
-				attackerWeapon = doer:GetTechId()
-			end
-		elseif HasMixin(doer, "Owner") then
-			if doer.GetWeaponTechId then
-				attackerWeapon = doer:GetWeaponTechId()
-			elseif doer.techId then
-				attackerWeapon = doer.techId
-				local deathIcon = doer.GetDeathIconIndex and doer:GetDeathIconIndex() or nil
+    if attacker and doer then
+        if doer.GetClassName and classNameToTechId[doer:GetClassName()] then
+            attackerWeapon = classNameToTechId[doer:GetClassName()]
+        elseif doer:GetParent() and doer:GetParent():isa("Player") then
+            if attacker:isa("Alien") and ((attacker:isa("Gorge") and doer.secondaryAttacking) or doer.shootingSpikes) then
+                attackerWeapon = attacker:GetActiveWeapon():GetSecondaryTechId()
+            else
+                attackerWeapon = doer:GetTechId()
+            end
+        elseif HasMixin(doer, "Owner") then
+            if doer.GetWeaponTechId then
+                attackerWeapon = doer:GetWeaponTechId()
+            elseif doer.techId then
+                attackerWeapon = doer.techId
+                local deathIcon = doer.GetDeathIconIndex and doer:GetDeathIconIndex() or nil
 
-				-- Translate the deathicon into a techid we can use for the end-game stats
-				if deathIcon == kDeathMessageIcon.Mine then
-					attackerWeapon = kTechId.LayMines
-				elseif deathIcon == kDeathMessageIcon.PulseGrenade then
-					attackerWeapon = kTechId.PulseGrenade
-				elseif deathIcon == kDeathMessageIcon.ClusterGrenade then
-					attackerWeapon = kTechId.ClusterGrenade
-				elseif deathIcon == kDeathMessageIcon.Flamethrower then
-					attackerWeapon = kTechId.Flamethrower
-				elseif deathIcon == kDeathMessageIcon.EMPBlast then
-					attackerWeapon = kTechId.PowerSurge
-				end
-			end
-		end
-	end
+                -- Translate the deathicon into a techid we can use for the end-game stats
+                if deathIcon == kDeathMessageIcon.Mine then
+                    attackerWeapon = kTechId.LayMines
+                elseif deathIcon == kDeathMessageIcon.PulseGrenade then
+                    attackerWeapon = kTechId.PulseGrenade
+                elseif deathIcon == kDeathMessageIcon.ClusterGrenade then
+                    attackerWeapon = kTechId.ClusterGrenade
+                elseif deathIcon == kDeathMessageIcon.Flamethrower then
+                    attackerWeapon = kTechId.Flamethrower
+                elseif deathIcon == kDeathMessageIcon.EMPBlast then
+                    attackerWeapon = kTechId.PowerSurge
+                end
+            end
+        end
+    end
 
-	return attackerSteamId, attackerWeapon, attackerTeam
+    return attackerSteamId, attackerWeapon, attackerTeam
 end
 
 function StatsUI_GetStatForClient(steamId)
-	return STATS_ClientStats[steamId]
+    return STATS_ClientStats[steamId]
 end
 
 function StatsUI_GetStatForCommander(commanderSteamId)
-	return STATS_CommStats[commanderSteamId]
+    return STATS_CommStats[commanderSteamId]
 end
 
 function StatsUI_SetBaseClientStatsInfo(steamId, playerName, playerSkill, playerSkillOffset, commanderSkill, commanderSkillOffset, adagrad, commAdagrad, isRookie)
-	local stat = StatsUI_GetStatForClient(steamId)
-	if stat then
-		stat.playerName = playerName
-		stat.hiveSkillMarine = (playerSkill + playerSkillOffset) or 0
-		stat.hiveSkillAlien = (playerSkill - playerSkillOffset) or 0
-		stat.hiveSkill = playerSkill or 0
-		stat.playerSkillOffset = playerSkillOffset
-		stat.commanderSkillMarine = (commanderSkill + commanderSkillOffset) or 0
-		stat.commanderSkillAlien = (commanderSkill - commanderSkillOffset) or 0
-		stat.commanderSkill = commanderSkill or 0
-		stat.commanderSkillOffset = commanderSkillOffset
-		--print("Comskill: " .. tostring(stat.commanderSkill))
-		--print("ComskillMarine: " .. tostring(stat.commanderSkillMarine))
-		--print("ComskillAlien: " .. tostring(stat.commanderSkillAlien))
-		--print("ComskillOffset: " .. tostring(commanderSkillOffset))
-		stat.adagrad = adagrad
-		stat.commAdagrad = commAdagrad
-		stat.isRookie = isRookie
-	end
+    local stat = StatsUI_GetStatForClient(steamId)
+    if stat then
+        stat.playerName = playerName
+        stat.hiveSkillMarine = (playerSkill + playerSkillOffset) or 0
+        stat.hiveSkillAlien = (playerSkill - playerSkillOffset) or 0
+        stat.hiveSkill = playerSkill or 0
+        stat.playerSkillOffset = playerSkillOffset
+        stat.commanderSkillMarine = (commanderSkill + commanderSkillOffset) or 0
+        stat.commanderSkillAlien = (commanderSkill - commanderSkillOffset) or 0
+        stat.commanderSkill = commanderSkill or 0
+        stat.commanderSkillOffset = commanderSkillOffset
+        -- print("Comskill: " .. tostring(stat.commanderSkill))
+        -- print("ComskillMarine: " .. tostring(stat.commanderSkillMarine))
+        -- print("ComskillAlien: " .. tostring(stat.commanderSkillAlien))
+        -- print("ComskillOffset: " .. tostring(commanderSkillOffset))
+        stat.adagrad = adagrad
+        stat.commAdagrad = commAdagrad
+        stat.isRookie = isRookie
+    end
 end
 
 local statusGrouping = {}
@@ -661,706 +624,771 @@ statusGrouping[kPlayerStatus.OnosEgg] = kPlayerStatus.Embryo
 statusGrouping[kPlayerStatus.Evolving] = kPlayerStatus.Embryo
 
 function StatsUI_GetStatusGrouping(playerStatus)
-	return statusGrouping[playerStatus]
+    return statusGrouping[playerStatus]
 end
 
-local kBioMassTechIds =
-	enum(
-	{
-		kTechId.BioMassOne,
-		kTechId.BioMassTwo,
-		kTechId.BioMassThree,
-		kTechId.BioMassFour,
-		kTechId.BioMassFive,
-		kTechId.BioMassSix,
-		kTechId.BioMassSeven,
-		kTechId.BioMassEight,
-		kTechId.BioMassNine
-	}
-)
+local kBioMassTechIds = enum({kTechId.BioMassOne, kTechId.BioMassTwo, kTechId.BioMassThree, kTechId.BioMassFour, kTechId.BioMassFive, kTechId.BioMassSix, kTechId.BioMassSeven, kTechId.BioMassEight, kTechId.BioMassNine})
 
 function StatsUI_GetBiomassTechIdFromLevel(biomassLevel)
-	return kBioMassTechIds[biomassLevel]
+    return kBioMassTechIds[biomassLevel]
 end
 
 function StatsUI_ResetCommStats(commSteamId)
-	if not STATS_CommStats[commSteamId] then
-		STATS_CommStats[commSteamId] = {}
-		STATS_CommStats[commSteamId]["medpack"] = {}
-		STATS_CommStats[commSteamId]["ammopack"] = {}
-		STATS_CommStats[commSteamId]["catpack"] = {}
+    if not STATS_CommStats[commSteamId] then
+        STATS_CommStats[commSteamId] = {}
+        STATS_CommStats[commSteamId]["medpack"] = {}
+        STATS_CommStats[commSteamId]["ammopack"] = {}
+        STATS_CommStats[commSteamId]["catpack"] = {}
 
-		for index, _ in pairs(STATS_CommStats[commSteamId]) do
-			STATS_CommStats[commSteamId][index].picks = 0
-			STATS_CommStats[commSteamId][index].misses = 0
+        for index, _ in pairs(STATS_CommStats[commSteamId]) do
+            STATS_CommStats[commSteamId][index].picks = 0
+            STATS_CommStats[commSteamId][index].misses = 0
 
-			if index ~= "catpack" then
-				STATS_CommStats[commSteamId][index].refilled = 0
-			end
+            if index ~= "catpack" then
+                STATS_CommStats[commSteamId][index].refilled = 0
+            end
 
-			if index == "medpack" then
-				STATS_CommStats[commSteamId][index].hitsAcc = 0
-			end
-		end
-	end
+            if index == "medpack" then
+                STATS_CommStats[commSteamId][index].hitsAcc = 0
+            end
+        end
+    end
 end
 
 function StatsUI_ResetStats()
-	STATS_CommStats = {}
-	STATS_ClientStats = {}
+    STATS_CommStats = {}
+    STATS_ClientStats = {}
 
-	STATS_RTGraph = {}
-	STATS_KillGraph = {}
-	STATS_EquipmentAndLifeforms = {}
-	STATS_TeamSpecificStats = {}
+    STATS_RTGraph = {}
+    STATS_KillGraph = {}
+    STATS_EquipmentAndLifeforms = {}
+    STATS_TeamSpecificStats = {}
 
-	STATS_TeamStats[1] = {}
-	STATS_TeamStats[1].hits = 0
-	STATS_TeamStats[1].onosHits = 0
-	STATS_TeamStats[1].misses = 0
-	STATS_TeamStats[1].rts = {
-		lost = 0,
-		built = 0
-	}
-	STATS_TeamStats[1].maxPlayers = 0
-	-- Easier to read for servers parsing the jsons
-	STATS_TeamStats[1].teamNumber = 1
+    STATS_TeamStats[1] = {}
+    STATS_TeamStats[1].hits = 0
+    STATS_TeamStats[1].onosHits = 0
+    STATS_TeamStats[1].misses = 0
+    STATS_TeamStats[1].rts = {
+        lost = 0,
+        built = 0
+    }
+    STATS_TeamStats[1].maxPlayers = 0
+    -- Easier to read for servers parsing the jsons
+    STATS_TeamStats[1].teamNumber = 1
 
-	STATS_TeamStats[2] = {}
-	STATS_TeamStats[2].hits = 0
-	STATS_TeamStats[2].misses = 0
-	STATS_TeamStats[2].rts = {
-		lost = 0,
-		built = 0
-	}
-	STATS_TeamStats[2].maxPlayers = 0
-	-- Easier to read for servers parsing the jsons
-	STATS_TeamStats[2].teamNumber = 2
+    STATS_TeamStats[2] = {}
+    STATS_TeamStats[2].hits = 0
+    STATS_TeamStats[2].misses = 0
+    STATS_TeamStats[2].rts = {
+        lost = 0,
+        built = 0
+    }
+    STATS_TeamStats[2].maxPlayers = 0
+    -- Easier to read for servers parsing the jsons
+    STATS_TeamStats[2].teamNumber = 2
 
-	STATS_ResearchTree = {}
+    STATS_ResearchTree = {}
 
-	STATS_BuildingSummary = {}
-	STATS_BuildingSummary[1] = {}
-	STATS_BuildingSummary[2] = {}
+    STATS_BuildingSummary = {}
+    STATS_BuildingSummary[1] = {}
+    STATS_BuildingSummary[2] = {}
 
-	STATS_ExportResearch = {}
-	STATS_ExportBuilding = {}
+    STATS_ExportResearch = {}
+    STATS_ExportBuilding = {}
 
-	STATS_PresGraphAliens = {}
-	STATS_PresGraphMarines = {}
+    STATS_PresGraphAliens = {}
+    STATS_PresGraphMarines = {}
 
-	-- Do this so we can spawn items without a commander with cheats on
-	StatsUI_SetMarineCommmaderSteamID(0)
-	StatsUI_ResetCommStats(StatsUI_GetMarineCommmaderSteamID())
+    -- Do this so we can spawn items without a commander with cheats on
+    StatsUI_SetMarineCommmaderSteamID(0)
+    StatsUI_ResetCommStats(StatsUI_GetMarineCommmaderSteamID())
 
-	STATS_HiveSkillGraph = {}
+    STATS_HiveSkillGraph = {}
 
-	for _, playerInfo in ientitylist(Shared.GetEntitiesWithClassname("PlayerInfoEntity")) do
-		local teamNumber = playerInfo.teamNumber
-		local steamId = playerInfo.steamId
+    for _, playerInfo in ientitylist(Shared.GetEntitiesWithClassname("PlayerInfoEntity")) do
+        local teamNumber = playerInfo.teamNumber
+        local steamId = playerInfo.steamId
 
-		if playerInfo.isCommander then
-			if teamNumber == kTeam1Index then
-				StatsUI_SetMarineCommmaderSteamID(steamId)
-				StatsUI_ResetCommStats(steamId)
-			end
+        if playerInfo.isCommander then
+            if teamNumber == kTeam1Index then
+                StatsUI_SetMarineCommmaderSteamID(steamId)
+                StatsUI_ResetCommStats(steamId)
+            end
 
-			-- Init the commander player stats so they show up at the end-game stats
-			StatsUI_MaybeInitClientStats(steamId, nil, teamNumber)
-		end
-	end
-	manipulateVariables()
+            -- Init the commander player stats so they show up at the end-game stats
+            StatsUI_MaybeInitClientStats(steamId, nil, teamNumber)
+        end
+    end
+    manipulateVariables()
 end
 
 function StatsUI_InitializeTeamStatsAndTechPoints(self)
-	-- Add the team player counts on game reset
-	STATS_TeamStats[1].maxPlayers = math.max(0, self.team1:GetNumPlayers())
-	STATS_TeamStats[2].maxPlayers = math.max(0, self.team2:GetNumPlayers())
+    -- Add the team player counts on game reset
+    STATS_TeamStats[1].maxPlayers = math.max(0, self.team1:GetNumPlayers())
+    STATS_TeamStats[2].maxPlayers = math.max(0, self.team2:GetNumPlayers())
 
-	-- Starting tech points
-	STATS_StartingTechPoints["1"] = locationsLookup[self.startingLocationNameTeam1]
-	STATS_StartingTechPoints["2"] = locationsLookup[self.startingLocationNameTeam2]
+    -- Starting tech points
+    STATS_StartingTechPoints["1"] = locationsLookup[self.startingLocationNameTeam1]
+    STATS_StartingTechPoints["2"] = locationsLookup[self.startingLocationNameTeam2]
 end
 
 local function CHUDGetAccuracy(hits, misses, onosHits)
-	local accuracy = 0
-	local accuracyOnos = ConditionalValue(onosHits == 0, -1, 0)
+    local accuracy = 0
+    local accuracyOnos = ConditionalValue(onosHits == 0, -1, 0)
 
-	if hits > 0 or misses > 0 then
-		accuracy = hits / (hits + misses) * 100
-		if onosHits and onosHits > 0 and hits ~= onosHits then
-			accuracyOnos = (hits - onosHits) / ((hits - onosHits) + misses) * 100
-		end
-	end
+    if hits > 0 or misses > 0 then
+        accuracy = hits / (hits + misses) * 100
+        if onosHits and onosHits > 0 and hits ~= onosHits then
+            accuracyOnos = (hits - onosHits) / ((hits - onosHits) + misses) * 100
+        end
+    end
 
-	return accuracy, accuracyOnos
+    return accuracy, accuracyOnos
 end
 
 local lastRoundStats = {}
 function CHUDGetLastRoundStats()
-	return lastRoundStats
+    return lastRoundStats
 end
 
 function StatsUI_FormatRoundStats()
-	local finalStats = {}
-	finalStats[1] = {}
-	finalStats[2] = {}
+    local finalStats = {}
+    finalStats[1] = {}
+    finalStats[2] = {}
 
-	-- reformat stats for export
-	for steamId, stats in pairs(STATS_ClientStats) do
-		-- Easier format for easy parsing server-side
-		local newWeaponsTable = {}
-		for wTechId, wStats in pairs(stats["weapons"]) do
-			-- Use more consistent naming for exporting stats
-			wStats.playerDamage = wStats.pdmg
-			wStats.structureDamage = wStats.sdmg
+    -- reformat stats for export
+    for steamId, stats in pairs(STATS_ClientStats) do
+        -- Easier format for easy parsing server-side
+        local newWeaponsTable = {}
+        for wTechId, wStats in pairs(stats["weapons"]) do
+            -- Use more consistent naming for exporting stats
+            wStats.playerDamage = wStats.pdmg
+            wStats.structureDamage = wStats.sdmg
 
-			wStats.pdmg = nil
-			wStats.sdmg = nil
+            wStats.pdmg = nil
+            wStats.sdmg = nil
 
-			newWeaponsTable[EnumToString(kTechId, wTechId)] = wStats
-		end
-		stats["weapons"] = newWeaponsTable
+            newWeaponsTable[EnumToString(kTechId, wTechId)] = wStats
+        end
+        stats["weapons"] = newWeaponsTable
 
-		-- Easier format for easy parsing server-side
-		local newStatusTable = {}
-		for statusId, classTime in pairs(stats["status"]) do
-			table.insert(
-				newStatusTable,
-				{
-					statusId = EnumToString(kPlayerStatus, statusId),
-					classTime = classTime
-				}
-			)
-		end
-		stats["status"] = newStatusTable
+        -- Easier format for easy parsing server-side
+        local newStatusTable = {}
+        for statusId, classTime in pairs(stats["status"]) do
+            table.insert(newStatusTable, {
+                statusId = EnumToString(kPlayerStatus, statusId),
+                classTime = classTime
+            })
+        end
+        stats["status"] = newStatusTable
 
-		for teamNumber = 1, 2 do
-			local entry = stats[teamNumber]
-			if entry.timePlayed and entry.timePlayed > 0 then
-				local statEntry = {}
+        for teamNumber = 1, 2 do
+            local entry = stats[teamNumber]
+            if entry.timePlayed and entry.timePlayed > 0 then
+                local statEntry = {}
 
-				local accuracy, accuracyOnos = CHUDGetAccuracy(entry.hits, entry.misses, entry.onosHits)
-				local accFiltered = "NaN"
-				if teamNumber == 1 then
-					for wTechName, wStats in pairs(stats["weapons"]) do
-						if kTechId[wTechName] == kTechId.Rifle then
-							local accuracy, accuracyOnos = CHUDGetAccuracy(wStats.hits, wStats.misses, wStats.onosHits)
-							accFiltered = wTechName .. ": " .. round(accuracy, 0) .. "%"
-							if accuracyOnos > 0 and accuracy ~= accuracyOnos then
-								accFiltered = accFiltered .. " (" .. round(accuracyOnos, 0) .. "%)"
-							end
-						end
-					end
-				end
+                local accuracy, accuracyOnos = CHUDGetAccuracy(entry.hits, entry.misses, entry.onosHits)
+                local accFiltered = "NaN"
+                if teamNumber == 1 then
+                    for wTechName, wStats in pairs(stats["weapons"]) do
+                        if kTechId[wTechName] == kTechId.Rifle then
+                            local accuracy, accuracyOnos = CHUDGetAccuracy(wStats.hits, wStats.misses, wStats.onosHits)
+                            accFiltered = wTechName .. ": " .. round(accuracy, 0) .. "%"
+                            if accuracyOnos > 0 and accuracy ~= accuracyOnos then
+                                accFiltered = accFiltered .. " (" .. round(accuracyOnos, 0) .. "%)"
+                            end
+                        end
+                    end
+                end
 
-				--print("Stats dump: " .. dump(stats))
-				statEntry.isMarine = teamNumber == 1
-				statEntry.playerName = stats.playerName
-				statEntry.hiveSkill = stats.hiveSkill or 0
-				statEntry.hiveSkillMarine = stats.hiveSkillMarine or 0
-				statEntry.hiveSkillAlien = stats.hiveSkillAlien or 0
-				statEntry.commanderSkill = stats.commanderSkill or 0
-				statEntry.commanderSkillMarine = stats.commanderSkillMarine or 0
-				statEntry.commanderSkillAlien = stats.commanderSkillAlien or 0
-				statEntry.accuracyFiltered = accFiltered
-				statEntry.kills = entry.kills
-				statEntry.killstreak = entry.killstreak
-				statEntry.assists = entry.assists
-				statEntry.deaths = entry.deaths
-				statEntry.score = entry.score
-				statEntry.accuracy = accuracy
-				statEntry.accuracyOnos = accuracyOnos
-				statEntry.pdmg = entry.pdmg
-				statEntry.sdmg = entry.sdmg
-				statEntry.minutesBuilding = entry.timeBuilding / 60
-				statEntry.minutesMapCheck = entry.timeMapCheck / 60
-				statEntry.minutesPlaying = entry.timePlayed / 60
-				statEntry.minutesComm = entry.commanderTime / 60
-				statEntry.isRookie = entry.isRookie
-				statEntry.steamId = steamId
-				if teamNumber == 1 then
-					table.insert(finalStats[1], statEntry)
-				else
-					table.insert(finalStats[2], statEntry)
-				end
-			end
+                -- print("Stats dump: " .. dump(stats))
+                statEntry.isMarine = teamNumber == 1
+                statEntry.playerName = stats.playerName
+                statEntry.hiveSkill = stats.hiveSkill or 0
+                statEntry.hiveSkillMarine = stats.hiveSkillMarine or 0
+                statEntry.hiveSkillAlien = stats.hiveSkillAlien or 0
+                statEntry.commanderSkill = stats.commanderSkill or 0
+                statEntry.commanderSkillMarine = stats.commanderSkillMarine or 0
+                statEntry.commanderSkillAlien = stats.commanderSkillAlien or 0
+                statEntry.accuracyFiltered = accFiltered
+                statEntry.kills = entry.kills
+                statEntry.killstreak = entry.killstreak
+                statEntry.assists = entry.assists
+                statEntry.deaths = entry.deaths
+                statEntry.score = entry.score
+                statEntry.accuracy = accuracy
+                statEntry.accuracyOnos = accuracyOnos
+                statEntry.pdmg = entry.pdmg
+                statEntry.sdmg = entry.sdmg
+                statEntry.minutesBuilding = entry.timeBuilding / 60
+                statEntry.minutesMapCheck = entry.timeMapCheck / 60
+                statEntry.minutesPlaying = entry.timePlayed / 60
+                statEntry.minutesComm = entry.commanderTime / 60
+                statEntry.isRookie = entry.isRookie
+                statEntry.steamId = steamId
+                if teamNumber == 1 then
+                    table.insert(finalStats[1], statEntry)
+                else
+                    table.insert(finalStats[2], statEntry)
+                end
+            end
 
-			-- Use more consistent naming for exporting stats
-			entry.playerDamage = entry.pdmg
-			entry.structureDamage = entry.sdmg
+            -- Use more consistent naming for exporting stats
+            entry.playerDamage = entry.pdmg
+            entry.structureDamage = entry.sdmg
 
-			entry.pdmg = nil
-			entry.sdmg = nil
-		end
+            entry.pdmg = nil
+            entry.sdmg = nil
+        end
 
-		-- Remove last life stats and last update time from exported data
-		stats.last = nil
-		stats.lastUpdate = nil
-	end
+        -- Remove last life stats and last update time from exported data
+        stats.last = nil
+        stats.lastUpdate = nil
+    end
 
-	local newBuildingSummaryTable = {}
-	for teamNumber, team in pairs(STATS_BuildingSummary) do
-		for techId, entry in pairs(team) do
-			entry.teamNumber = teamNumber
-			entry.techId = EnumToString(kTechId, techId)
-			table.insert(newBuildingSummaryTable, entry)
-		end
-	end
+    local newBuildingSummaryTable = {}
+    for teamNumber, team in pairs(STATS_BuildingSummary) do
+        for techId, entry in pairs(team) do
+            entry.teamNumber = teamNumber
+            entry.techId = EnumToString(kTechId, techId)
+            table.insert(newBuildingSummaryTable, entry)
+        end
+    end
 
-	STATS_BuildingSummary = newBuildingSummaryTable
+    STATS_BuildingSummary = newBuildingSummaryTable
 
-	return finalStats
+    return finalStats
 end
 
 local function SendClientCommanderStats(client, steamId)
-	if not STATS_CommStats[steamId] then
-		return
-	end
+    if not STATS_CommStats[steamId] then
+        return
+    end
 
-	local msg = {
-		medpackAccuracy = 0,
-		medpackResUsed = 0,
-		medpackResExpired = 0,
-		medpackEfficiency = 0,
-		medpackRefill = 0,
-		ammopackResUsed = 0,
-		ammopackResExpired = 0,
-		ammopackEfficiency = 0,
-		ammopackRefill = 0,
-		catpackResUsed = 0,
-		catpackResExpired = 0,
-		catpackEfficiency = 0
-	}
+    local msg = {
+        medpackAccuracy = 0,
+        medpackResUsed = 0,
+        medpackResExpired = 0,
+        medpackEfficiency = 0,
+        medpackRefill = 0,
+        ammopackResUsed = 0,
+        ammopackResExpired = 0,
+        ammopackEfficiency = 0,
+        ammopackRefill = 0,
+        catpackResUsed = 0,
+        catpackResExpired = 0,
+        catpackEfficiency = 0
+    }
 
-	for index, commStats in pairs(STATS_CommStats[steamId]) do
-		if commStats.picks and commStats.picks > 0 or commStats.misses and commStats.misses > 0 then
-			if index == "medpack" then
-				-- Add medpacks that were picked up later to the misses count for accuracy
-				msg.medpackAccuracy = CHUDGetAccuracy(commStats.hitsAcc, (commStats.picks - commStats.hitsAcc) + commStats.misses)
-				msg.medpackResUsed = commStats.picks * kMedPackCost
-				msg.medpackResExpired = commStats.misses * kMedPackCost
-				msg.medpackEfficiency = CHUDGetAccuracy(commStats.picks, commStats.misses)
-				msg.medpackRefill = commStats.refilled
-			elseif index == "ammopack" then
-				msg.ammopackResUsed = commStats.picks * kAmmoPackCost
-				msg.ammopackResExpired = commStats.misses * kAmmoPackCost
-				msg.ammopackEfficiency = CHUDGetAccuracy(commStats.picks, commStats.misses)
-				msg.ammopackRefill = commStats.refilled
-			elseif index == "catpack" then
-				msg.catpackResUsed = commStats.picks * kCatPackCost
-				msg.catpackResExpired = commStats.misses * kCatPackCost
-				msg.catpackEfficiency = CHUDGetAccuracy(commStats.picks, commStats.misses)
-			end
-		end
-	end
+    for index, commStats in pairs(STATS_CommStats[steamId]) do
+        if commStats.picks and commStats.picks > 0 or commStats.misses and commStats.misses > 0 then
+            if index == "medpack" then
+                -- Add medpacks that were picked up later to the misses count for accuracy
+                msg.medpackAccuracy = CHUDGetAccuracy(commStats.hitsAcc, (commStats.picks - commStats.hitsAcc) + commStats.misses)
+                msg.medpackResUsed = commStats.picks * kMedPackCost
+                msg.medpackResExpired = commStats.misses * kMedPackCost
+                msg.medpackEfficiency = CHUDGetAccuracy(commStats.picks, commStats.misses)
+                msg.medpackRefill = commStats.refilled
+            elseif index == "ammopack" then
+                msg.ammopackResUsed = commStats.picks * kAmmoPackCost
+                msg.ammopackResExpired = commStats.misses * kAmmoPackCost
+                msg.ammopackEfficiency = CHUDGetAccuracy(commStats.picks, commStats.misses)
+                msg.ammopackRefill = commStats.refilled
+            elseif index == "catpack" then
+                msg.catpackResUsed = commStats.picks * kCatPackCost
+                msg.catpackResExpired = commStats.misses * kCatPackCost
+                msg.catpackEfficiency = CHUDGetAccuracy(commStats.picks, commStats.misses)
+            end
+        end
+    end
 
-	Server.SendNetworkMessage(client, "MarineCommStats", msg, true)
+    Server.SendNetworkMessage(client, "MarineCommStats", msg, true)
 end
 
 function StatsUI_SendPlayerStats(player)
-	local client = player:GetClient()
-	if not client then
-		return
-	end
+    local client = player:GetClient()
+    if not client then
+        return
+    end
 
-	local steamId = player:GetSteamId()
-	if not steamId or steamId < 1 then
-		return
-	end
+    local steamId = player:GetSteamId()
+    if not steamId or steamId < 1 then
+        return
+    end
 
-	local stats = STATS_ClientStats[steamId]
-	if not stats then
-		return
-	end
+    local stats = STATS_ClientStats[steamId]
+    if not stats then
+        return
+    end
 
-	-- Commander stats
-	SendClientCommanderStats(client, steamId)
+    -- Commander stats
+    SendClientCommanderStats(client, steamId)
 
-	for wTechName, wStats in pairs(stats["weapons"]) do
-		local accuracy, accuracyOnos = CHUDGetAccuracy(wStats.hits, wStats.misses, wStats.onosHits)
+    for wTechName, wStats in pairs(stats["weapons"]) do
+        local accuracy, accuracyOnos = CHUDGetAccuracy(wStats.hits, wStats.misses, wStats.onosHits)
 
-		local msg = {}
-		msg.wTechId = kTechId[wTechName]
-		msg.accuracy = accuracy
-		msg.accuracyOnos = accuracyOnos
-		msg.kills = wStats.kills
-		msg.pdmg = wStats.playerDamage
-		msg.sdmg = wStats.structureDamage
-		msg.teamNumber = wStats.teamNumber
-		-- Log("NS2+ %s : %s -> %s", wTechId, wStats, msg )
-		Server.SendNetworkMessage(client, "EndStatsWeapon", msg, true)
-	end
+        local msg = {}
+        msg.wTechId = kTechId[wTechName]
+        msg.accuracy = accuracy
+        msg.accuracyOnos = accuracyOnos
+        msg.kills = wStats.kills
+        msg.pdmg = wStats.playerDamage
+        msg.sdmg = wStats.structureDamage
+        msg.teamNumber = wStats.teamNumber
+        -- Log("NS2+ %s : %s -> %s", wTechId, wStats, msg )
+        Server.SendNetworkMessage(client, "EndStatsWeapon", msg, true)
+    end
 
-	for i = 1, #stats.status do
-		local entry = stats.status[i]
-		local msg = {}
+    for i = 1, #stats.status do
+        local entry = stats.status[i]
+        local msg = {}
 
-		msg.statusId = kPlayerStatus[entry.statusId]
-		msg.timeMinutes = entry.classTime / 60
-		Server.SendNetworkMessage(client, "EndStatsStatus", msg, true)
-	end
+        msg.statusId = kPlayerStatus[entry.statusId]
+        msg.timeMinutes = entry.classTime / 60
+        Server.SendNetworkMessage(client, "EndStatsStatus", msg, true)
+    end
 end
 
 local function timeAsClass(steamId, class)
-	local stats = STATS_ClientStats[steamId]
-	if not stats then
-		return 0
-	end
-	for i = 1, #stats.status do
-		if stats.status[i].statusId == class then
-			return stats.status[i].classTime
-		end
-	end
-	return 0
+    local stats = STATS_ClientStats[steamId]
+    if not stats then
+        return 0
+    end
+    for i = 1, #stats.status do
+        if stats.status[i].statusId == class then
+            return stats.status[i].classTime
+        end
+    end
+    return 0
 end
 
-function StatsUI_SendTeamStats()
-	local team1Accuracy, team1OnosAccuracy = CHUDGetAccuracy(STATS_TeamStats[1].hits, STATS_TeamStats[1].misses, STATS_TeamStats[1].onosHits)
-	local team2Accuracy = CHUDGetAccuracy(STATS_TeamStats[2].hits, STATS_TeamStats[2].misses)
+local function sendCompressRTGraphTable(rtGraphTable)
+    if not rtGraphTable or #rtGraphTable == 0 then
+        return
+    end
 
-	local msg = {}
-	msg.marineAcc = team1Accuracy
-	msg.marineOnosAcc = team1OnosAccuracy
-	msg.marineRTsBuilt = STATS_TeamStats[1]["rts"].built
-	msg.marineRTsLost = STATS_TeamStats[1]["rts"].lost
-	msg.alienAcc = team2Accuracy
-	msg.alienRTsBuilt = STATS_TeamStats[2]["rts"].built
-	msg.alienRTsLost = STATS_TeamStats[2]["rts"].lost
-	msg.gameLengthMinutes = GetGameTime(true)
+	local entries = ""
 
-	Server.SendNetworkMessage("GameData", msg, true)
+    for i = 1, #rtGraphTable do
+        local row = rtGraphTable[i]
+        local team = row.teamNumber or 0
+        local minute = string.format("%.2f", row.gameMinute or 0)
+        local destroyed = row.destroyed and "1" or "0"
 
-	for _, entry in ipairs(STATS_ResearchTree) do
-		-- Exclude the initial buildings (finishedMinute is 0 and teamRes is 0)
-		if entry.finishedMinute > 0 or entry.teamRes > 0 then
-			Server.SendNetworkMessage("TechLog", entry, true)
-		end
-	end
+        local entry = string.format("%d,%s,%s", team, minute, destroyed)
+        -- Check size of the string + new entry if it exceeds max size
+        if string.len(entries) + string.len(entry) + 1 > MAX_PAYLOAD_SIZE then
+            Server.SendNetworkMessage("RTGraphData", {
+                data = entries
+            }, true)
+            entries = ""
+        end
+        entries = entries .. entry .. ";"
+    end
 
-	for _, entry in ipairs(STATS_HiveSkillGraph) do
-		Server.SendNetworkMessage("HiveSkillGraph", entry, true)
-	end
-
-	for _, entry in ipairs(STATS_RTGraph) do
-		Server.SendNetworkMessage("RTGraph", entry, true)
-	end
-
-	-- Alien Code...
-	for _, entry in ipairs(STATS_KillGraph) do
-		if stringToTechID[entry.victimClass] then
-			StatsUI_RegisterLost(stringToTechID[entry.victimClass])
-		end
-	end
-
-	local EaL_Data = {}
-	for index, row in ipairs(STATS_EquipmentAndLifeforms) do
-		if not EaL_Data[row.name] then
-			EaL_Data[row.name] = {}
-			EaL_Data[row.name].name = row.name
-			EaL_Data[row.name].lostCount = 0
-			EaL_Data[row.name].buyCount = 0
-		end
-		if row.destroyed then
-			EaL_Data[row.name].lostCount = EaL_Data[row.name].lostCount + 1
-		else
-			EaL_Data[row.name].buyCount = EaL_Data[row.name].buyCount + 1
-		end
-	end
-
-	--Send all EQ and Lifeforms
-	--print("Send EALStats: " .. dump(EaL_Data))
-	--print("Type: " .. type(EaL_Data))
-	for _, entry in pairs(EaL_Data) do
-		--print("Sending entry: " .. dump(entry))
-		Server.SendNetworkMessage("EalStats", entry, true)
-	end
-
-	--Team Specific Stats --todois
-	----Manipulate stats
-	for i in pairs(STATS_TeamSpecificStats) do
-		if i == "Parasite" then
-			for i2 in pairs(STATS_TeamSpecificStats[i]) do
-				local timeClass = timeAsClass(i2, "Skulk") / 60
-				STATS_TeamSpecificStats[i][i2] = roundNumber(STATS_TeamSpecificStats[i][i2] / timeClass, 2)
-			end
-		end
-	end
-	----Sending stats
-	for i in pairs(STATS_TeamSpecificStats) do
-		local msg = {}
-		msg.techName = i
-		for i2 in pairs(STATS_TeamSpecificStats[i]) do
-			msg.steamId = i2
-			msg.value = round(STATS_TeamSpecificStats[i][i2], 2)
-			Server.SendNetworkMessage("TeamSpecificStats", msg, true)
-		end
-	end
-
-	for _, entry in ipairs(STATS_KillGraph) do
-		Server.SendNetworkMessage("KillGraph", entry, true)
-		-- Remove the game minute so it doesn't get exported
-		entry.gameMinute = nil
-	end
-
-	for _, entry in pairs(STATS_BuildingSummary) do
-		local buildMsg = {}
-		buildMsg.teamNumber = entry.teamNumber
-		buildMsg.techId = kTechId[entry.techId]
-		buildMsg.built = entry.built
-		buildMsg.lost = entry.lost
-		Server.SendNetworkMessage("BuildingSummary", buildMsg, true)
-	end
-
-	--currently unused because of LessNetworkData
-	--[[
-		for _, entry in ipairs(STATS_PresGraphMarines) do
-		Server.SendNetworkMessage("PresGraphStatsMarines", entry, true)
-	end
-
-	for _, entry in ipairs(STATS_PresGraphAliens) do
-		Server.SendNetworkMessage("PresGraphStatsAliens", entry, true)
-	end
-	]]
+    if string.len(entries) > 0 then
+        Server.SendNetworkMessage("RTGraphData", {
+            data = entries
+        }, true)
+    end
 end
 
-local function GetServerMods()
-	local mods = {}
-
-	-- Can't get the mod title correctly unless we do this
-	-- GetModTitle can't get it from the active mod list index, it uses the normal one
-	local activeModIds = {}
-	for modNum = 1, Server.GetNumActiveMods() do
-		activeModIds[Server.GetActiveModId(modNum)] = true
-	end
-
-	for modNum = 1, Server.GetNumMods() do
-		local modId = Server.GetModId(modNum)
-		if activeModIds[modId] then
-			table.insert(
-				mods,
-				{
-					modId = modId,
-					name = Server.GetModTitle(modNum)
-				}
-			)
-		end
-	end
-
-	return mods
-end
-
-function StatsUI_UploadRoundStats(endpoint)
-	Log("Uploading stats to remote endpoint %s", endpoint.url)
-
-	Shared.SendHTTPRequest(
-		endpoint.url,
-		"POST",
-		{authToken = endpoint.authToken, stats = json.encode(lastRoundStats)},
-		function(result, error, code)
-			Log("Round stats upload to endpoint %s complete, result code: %s", endpoint.url, code)
-		end
-	)
-end
-
-function StatsUI_SaveRoundStats(winningTeam)
-	if AdvancedServerOptions["savestats"].currentValue == false then
+local function sendCompressPresGraphData(presGraphData, teamNumber)
+	if not presGraphData or #presGraphData == 0 then
 		return
 	end
 
-	lastRoundStats = {}
-	lastRoundStats.MarineCommStats = STATS_CommStats
-	lastRoundStats.PlayerStats = STATS_ClientStats
-	lastRoundStats.KillFeed = STATS_KillGraph
+	local entries = ""
 
-	lastRoundStats.ServerInfo = {
-		ip = Server.GetIpAddress(),
-		port = Server.GetPort(),
-		name = Server.GetName(),
-		slots = Server.GetMaxPlayers(),
-		buildNumber = Shared.GetBuildNumber(),
-		rookieOnly = Server.GetHasTag("rookie_only"),
-		mods = GetServerMods()
-	}
+	-- format: gameMinute;presUnused;presEquipped;rtAmount;playerCount
+	for i = 1, #presGraphData do
+		local row = presGraphData[i]
+		local minute = string.format("%.2f", row.gameMinute or 0)
+		local presUnused = string.format("%.1f", row.presUnused or 0)
+		local presEquipped = string.format("%.1f", row.presEquipped or 0)
+		local rtAmount = row.rtAmount or 0
+		local playerCount = row.playerCount or 0
 
-	lastRoundStats.RoundInfo = {
-		mapName = Shared.GetMapName(),
-		minimapExtents = minimapExtents,
-		roundDate = Shared.GetSystemTime(),
-		roundLength = GetGameTime(),
-		startingLocations = STATS_StartingTechPoints,
-		winningTeam = winningTeam and winningTeam.GetTeamType and winningTeam:GetTeamType() or kNeutralTeamType,
-		tournamentMode = Shared.GetThunderdomeEnabled(),
-		maxPlayers1 = STATS_TeamStats[1].maxPlayers,
-		maxPlayers2 = STATS_TeamStats[2].maxPlayers,
-		gameMode = GetGamemode and GetGamemode() or "ns2"
-	}
-
-	lastRoundStats.Locations = locationsTable
-	lastRoundStats.Buildings = STATS_ExportBuilding
-	lastRoundStats.Research = STATS_ExportResearch
-
-	if type(STATS_remoteEndpoint) == "table" then
-		Log("Beginning remote stats upload...")
-
-		if type(STATS_remoteEndpoint.endpoint) == "table" then
-			StatsUI_UploadRoundStats(STATS_remoteEndpoint.endpoint)
+		local entry = string.format("%s,%s,%s,%d,%d", minute, presUnused, presEquipped, rtAmount, playerCount)
+		-- Check size of the string + new entry if it exceeds max size
+		if string.len(entries) + string.len(entry) + 1 > MAX_PAYLOAD_SIZE then
+			Server.SendNetworkMessage("presGraphData", {
+				teamNumber = teamNumber,
+				data = entries
+			}, true)
+			entries = ""
 		end
-
-		if type(STATS_remoteEndpoint.altEndpoint) == "table" then
-			StatsUI_UploadRoundStats(STATS_remoteEndpoint.altEndpoint)
-		end
+		entries = entries .. entry .. ";"
 	end
 
-	local savedServerFile = io.open(string.format("config://%s%s.json", serverStatsPath, Shared.GetSystemTime()), "w+")
-	if savedServerFile then
-		savedServerFile:write(
-			json.encode(
-				lastRoundStats,
-				{
-					indent = true
-				}
-			)
-		)
-		io.close(savedServerFile)
+	if string.len(entries) > 0 then
+		Server.SendNetworkMessage("presGraphData", {
+			teamNumber = teamNumber,
+			data = entries
+		}, true)
 	end
+end
+
+local function sendCompressKillGraphData(killGraphData)
+    if not killGraphData or #killGraphData == 0 then
+        return
+    end
+
+    local entries = ""
+
+    -- format: gameMinute;killerTeamNumber
+    for i = 1, #killGraphData do
+        local row = killGraphData[i]
+        local minute = string.format("%.2f", row.gameMinute or 0)
+        local killerTeamNumber = row.killerTeamNumber or 0
+
+        local entry = string.format("%s,%d", minute, killerTeamNumber)
+        -- Check size of the string + new entry if it exceeds max size
+        if string.len(entries) + string.len(entry) + 1 > MAX_PAYLOAD_SIZE then
+            Server.SendNetworkMessage("KillGraphData", {
+                data = entries
+            }, true)
+            entries = ""
+        end
+        entries = entries .. entry .. ";"
+    end
+
+    if string.len(entries) > 0 then
+        Server.SendNetworkMessage("KillGraphData", {
+            data = entries
+        }, true)
+    end
+end
+
+function StatsUI_SendTeamStats()
+    local team1Accuracy, team1OnosAccuracy = CHUDGetAccuracy(STATS_TeamStats[1].hits, STATS_TeamStats[1].misses, STATS_TeamStats[1].onosHits)
+    local team2Accuracy = CHUDGetAccuracy(STATS_TeamStats[2].hits, STATS_TeamStats[2].misses)
+
+    local msg = {}
+    msg.marineAcc = team1Accuracy
+    msg.marineOnosAcc = team1OnosAccuracy
+    msg.marineRTsBuilt = STATS_TeamStats[1]["rts"].built
+    msg.marineRTsLost = STATS_TeamStats[1]["rts"].lost
+    msg.alienAcc = team2Accuracy
+    msg.alienRTsBuilt = STATS_TeamStats[2]["rts"].built
+    msg.alienRTsLost = STATS_TeamStats[2]["rts"].lost
+    msg.gameLengthMinutes = GetGameTime(true)
+
+    Server.SendNetworkMessage("GameData", msg, true)
+
+    for _, entry in ipairs(STATS_ResearchTree) do
+        -- Exclude the initial buildings (finishedMinute is 0 and teamRes is 0)
+        if entry.finishedMinute > 0 or entry.teamRes > 0 then
+            Server.SendNetworkMessage("TechLog", entry, true)
+        end
+    end
+
+    for _, entry in ipairs(STATS_HiveSkillGraph) do
+        Server.SendNetworkMessage("HiveSkillGraph", entry, true)
+    end
+
+    sendCompressRTGraphTable(STATS_RTGraph)
+
+    -- for _, entry in ipairs(STATS_RTGraph) do
+    --    Server.SendNetworkMessage("RTGraph", entry, true)
+    -- end
+
+    -- Alien Code...
+    for _, entry in ipairs(STATS_KillGraph) do
+        if stringToTechID[entry.victimClass] then
+            StatsUI_RegisterLost(stringToTechID[entry.victimClass])
+        end
+    end
+
+    local EaL_Data = {}
+    for index, row in ipairs(STATS_EquipmentAndLifeforms) do
+        if not EaL_Data[row.name] then
+            EaL_Data[row.name] = {}
+            EaL_Data[row.name].name = row.name
+            EaL_Data[row.name].lostCount = 0
+            EaL_Data[row.name].buyCount = 0
+        end
+        if row.destroyed then
+            EaL_Data[row.name].lostCount = EaL_Data[row.name].lostCount + 1
+        else
+            EaL_Data[row.name].buyCount = EaL_Data[row.name].buyCount + 1
+        end
+    end
+
+    -- Send all EQ and Lifeforms
+    for _, entry in pairs(EaL_Data) do
+        -- print("Sending entry: " .. dump(entry))
+        Server.SendNetworkMessage("EalStats", entry, true)
+    end
+
+    -- Team Specific Stats --todois
+    ----Manipulate stats
+    for i in pairs(STATS_TeamSpecificStats) do
+        if i == "Parasite" then
+            for i2 in pairs(STATS_TeamSpecificStats[i]) do
+                local timeClass = timeAsClass(i2, "Skulk") / 60
+                STATS_TeamSpecificStats[i][i2] = roundNumber(STATS_TeamSpecificStats[i][i2] / timeClass, 2)
+            end
+        end
+    end
+    ----Sending stats
+    for i in pairs(STATS_TeamSpecificStats) do
+        local msg = {}
+        msg.techName = i
+        for i2 in pairs(STATS_TeamSpecificStats[i]) do
+            msg.steamId = i2
+            msg.value = round(STATS_TeamSpecificStats[i][i2], 2)
+            Server.SendNetworkMessage("TeamSpecificStats", msg, true)
+        end
+    end
+
+    sendCompressKillGraphData(STATS_KillGraph)
+--[[     for _, entry in ipairs(STATS_KillGraph) do
+        Server.SendNetworkMessage("KillGraph", entry, true)
+        -- Remove the game minute so it doesn't get exported
+        entry.gameMinute = nil
+    end ]]
+
+    for _, entry in pairs(STATS_BuildingSummary) do
+        local buildMsg = {}
+        buildMsg.teamNumber = entry.teamNumber
+        buildMsg.techId = kTechId[entry.techId]
+        buildMsg.built = entry.built
+        buildMsg.lost = entry.lost
+        Server.SendNetworkMessage("BuildingSummary", buildMsg, true)
+    end
+
+	sendCompressPresGraphData(STATS_PresGraphMarines, kMarineTeamType)
+	sendCompressPresGraphData(STATS_PresGraphAliens, kAlienTeamType)
+end
+
+local function GetServerMods()
+    local mods = {}
+
+    -- Can't get the mod title correctly unless we do this
+    -- GetModTitle can't get it from the active mod list index, it uses the normal one
+    local activeModIds = {}
+    for modNum = 1, Server.GetNumActiveMods() do
+        activeModIds[Server.GetActiveModId(modNum)] = true
+    end
+
+    for modNum = 1, Server.GetNumMods() do
+        local modId = Server.GetModId(modNum)
+        if activeModIds[modId] then
+            table.insert(mods, {
+                modId = modId,
+                name = Server.GetModTitle(modNum)
+            })
+        end
+    end
+
+    return mods
+end
+
+function StatsUI_UploadRoundStats(endpoint)
+    Log("Uploading stats to remote endpoint %s", endpoint.url)
+
+    Shared.SendHTTPRequest(endpoint.url, "POST", {
+        authToken = endpoint.authToken,
+        stats = json.encode(lastRoundStats)
+    }, function(result, error, code)
+        Log("Round stats upload to endpoint %s complete, result code: %s", endpoint.url, code)
+    end)
+end
+
+function StatsUI_SaveRoundStats(winningTeam)
+    if AdvancedServerOptions["savestats"].currentValue == false then
+        return
+    end
+
+    lastRoundStats = {}
+    lastRoundStats.MarineCommStats = STATS_CommStats
+    lastRoundStats.PlayerStats = STATS_ClientStats
+    lastRoundStats.KillFeed = STATS_KillGraph
+
+    lastRoundStats.ServerInfo = {
+        ip = Server.GetIpAddress(),
+        port = Server.GetPort(),
+        name = Server.GetName(),
+        slots = Server.GetMaxPlayers(),
+        buildNumber = Shared.GetBuildNumber(),
+        rookieOnly = Server.GetHasTag("rookie_only"),
+        mods = GetServerMods()
+    }
+
+    lastRoundStats.RoundInfo = {
+        mapName = Shared.GetMapName(),
+        minimapExtents = minimapExtents,
+        roundDate = Shared.GetSystemTime(),
+        roundLength = GetGameTime(),
+        startingLocations = STATS_StartingTechPoints,
+        winningTeam = winningTeam and winningTeam.GetTeamType and winningTeam:GetTeamType() or kNeutralTeamType,
+        tournamentMode = Shared.GetThunderdomeEnabled(),
+        maxPlayers1 = STATS_TeamStats[1].maxPlayers,
+        maxPlayers2 = STATS_TeamStats[2].maxPlayers,
+        gameMode = GetGamemode and GetGamemode() or "ns2"
+    }
+
+    lastRoundStats.Locations = locationsTable
+    lastRoundStats.Buildings = STATS_ExportBuilding
+    lastRoundStats.Research = STATS_ExportResearch
+
+    if type(STATS_remoteEndpoint) == "table" then
+        Log("Beginning remote stats upload...")
+
+        if type(STATS_remoteEndpoint.endpoint) == "table" then
+            StatsUI_UploadRoundStats(STATS_remoteEndpoint.endpoint)
+        end
+
+        if type(STATS_remoteEndpoint.altEndpoint) == "table" then
+            StatsUI_UploadRoundStats(STATS_remoteEndpoint.altEndpoint)
+        end
+    end
+
+    local savedServerFile = io.open(string.format("config://%s%s.json", serverStatsPath, Shared.GetSystemTime()), "w+")
+    if savedServerFile then
+        savedServerFile:write(json.encode(lastRoundStats, {
+            indent = true
+        }))
+        io.close(savedServerFile)
+    end
 end
 
 function StatsUI_SendGlobalCommanderStats() -- TODO Roll this data into "core" stats (at least for disk-write)
-	local medpackHitsAcc = 0
-	local medpackMisses = 0
-	local medpackPicks = 0
-	local medpackRefill = 0
-	local ammopackPicks = 0
-	local ammopackMisses = 0
-	local ammopackRefill = 0
-	local catpackPicks = 0
-	local catpackMisses = 0
-	local sendCommStats = false
+    local medpackHitsAcc = 0
+    local medpackMisses = 0
+    local medpackPicks = 0
+    local medpackRefill = 0
+    local ammopackPicks = 0
+    local ammopackMisses = 0
+    local ammopackRefill = 0
+    local catpackPicks = 0
+    local catpackMisses = 0
+    local sendCommStats = false
 
-	for _, playerStats in pairs(STATS_CommStats) do
-		for index, stats in pairs(playerStats) do
-			if stats.picks and stats.picks > 0 or stats.misses and stats.misses > 0 then
-				sendCommStats = true
-				if index == "medpack" then
-					medpackHitsAcc = medpackHitsAcc + stats.hitsAcc
-					medpackPicks = medpackPicks + stats.picks
-					medpackMisses = medpackMisses + stats.misses
-					medpackRefill = medpackRefill + stats.refilled
-				elseif index == "ammopack" then
-					ammopackPicks = ammopackPicks + stats.picks
-					ammopackMisses = ammopackMisses + stats.misses
-					ammopackRefill = ammopackRefill + stats.refilled
-				elseif index == "catpack" then
-					catpackPicks = catpackPicks + stats.picks
-					catpackMisses = catpackMisses + stats.misses
-				end
-			end
-		end
-	end
+    for _, playerStats in pairs(STATS_CommStats) do
+        for index, stats in pairs(playerStats) do
+            if stats.picks and stats.picks > 0 or stats.misses and stats.misses > 0 then
+                sendCommStats = true
+                if index == "medpack" then
+                    medpackHitsAcc = medpackHitsAcc + stats.hitsAcc
+                    medpackPicks = medpackPicks + stats.picks
+                    medpackMisses = medpackMisses + stats.misses
+                    medpackRefill = medpackRefill + stats.refilled
+                elseif index == "ammopack" then
+                    ammopackPicks = ammopackPicks + stats.picks
+                    ammopackMisses = ammopackMisses + stats.misses
+                    ammopackRefill = ammopackRefill + stats.refilled
+                elseif index == "catpack" then
+                    catpackPicks = catpackPicks + stats.picks
+                    catpackMisses = catpackMisses + stats.misses
+                end
+            end
+        end
+    end
 
-	if sendCommStats then
-		local comMsg = {
-			medpackAccuracy = CHUDGetAccuracy(medpackHitsAcc, (medpackPicks - medpackHitsAcc) + medpackMisses),
-			medpackResUsed = medpackPicks,
-			medpackResExpired = medpackMisses,
-			medpackEfficiency = CHUDGetAccuracy(medpackPicks, medpackMisses),
-			medpackRefill = medpackRefill,
-			ammopackResUsed = ammopackPicks,
-			ammopackResExpired = ammopackMisses,
-			ammopackEfficiency = CHUDGetAccuracy(ammopackPicks, ammopackMisses),
-			ammopackRefill = ammopackRefill,
-			catpackResUsed = catpackPicks,
-			catpackResExpired = catpackMisses,
-			catpackEfficiency = CHUDGetAccuracy(catpackPicks, catpackMisses)
-		}
+    if sendCommStats then
+        local comMsg = {
+            medpackAccuracy = CHUDGetAccuracy(medpackHitsAcc, (medpackPicks - medpackHitsAcc) + medpackMisses),
+            medpackResUsed = medpackPicks,
+            medpackResExpired = medpackMisses,
+            medpackEfficiency = CHUDGetAccuracy(medpackPicks, medpackMisses),
+            medpackRefill = medpackRefill,
+            ammopackResUsed = ammopackPicks,
+            ammopackResExpired = ammopackMisses,
+            ammopackEfficiency = CHUDGetAccuracy(ammopackPicks, ammopackMisses),
+            ammopackRefill = ammopackRefill,
+            catpackResUsed = catpackPicks,
+            catpackResExpired = catpackMisses,
+            catpackEfficiency = CHUDGetAccuracy(catpackPicks, catpackMisses)
+        }
 
-		Server.SendNetworkMessage("GlobalCommStats", comMsg, true)
-	end
+        Server.SendNetworkMessage("GlobalCommStats", comMsg, true)
+    end
 end
 
 function StatsUI_HandlePreOnKill(self, killer, doer, point, direction)
-	-- Send stats to the player on death
-	if GetGamerules():GetGameStarted() then
-		local steamId = self:GetSteamId()
-		if steamId and steamId > 0 then
-			local teamNumber = self:GetTeamNumber()
-			StatsUI_MaybeInitClientStats(steamId, nil, teamNumber)
+    -- Send stats to the player on death
+    if GetGamerules():GetGameStarted() then
+        local steamId = self:GetSteamId()
+        if steamId and steamId > 0 then
+            local teamNumber = self:GetTeamNumber()
+            StatsUI_MaybeInitClientStats(steamId, nil, teamNumber)
 
-			if STATS_ClientStats[steamId] then
-				local lastStat = STATS_ClientStats[steamId]["last"]
-				local totalStats = STATS_ClientStats[steamId]["weapons"]
-				local msg = {}
-				local lastAcc = 0
-				local lastAccOnos = 0
-				local currentAcc = 0
-				local currentAccOnos = 0
-				local hitssum = 0
-				local missessum = 0
-				local onossum = 0
+            if STATS_ClientStats[steamId] then
+                local lastStat = STATS_ClientStats[steamId]["last"]
+                local totalStats = STATS_ClientStats[steamId]["weapons"]
+                local msg = {}
+                local lastAcc = 0
+                local lastAccOnos = 0
+                local currentAcc = 0
+                local currentAccOnos = 0
+                local hitssum = 0
+                local missessum = 0
+                local onossum = 0
 
-				for _, wStats in pairs(totalStats) do
-					-- Display current accuracy for the current team's weapons
-					if wStats.teamNumber == teamNumber then
-						hitssum = hitssum + wStats.hits
-						onossum = onossum + wStats.onosHits
-						missessum = missessum + wStats.misses
-					end
-				end
+                for _, wStats in pairs(totalStats) do
+                    -- Display current accuracy for the current team's weapons
+                    if wStats.teamNumber == teamNumber then
+                        hitssum = hitssum + wStats.hits
+                        onossum = onossum + wStats.onosHits
+                        missessum = missessum + wStats.misses
+                    end
+                end
 
-				if lastStat.hits > 0 or lastStat.misses > 0 then
-					lastAcc, lastAccOnos = CHUDGetAccuracy(lastStat.hits, lastStat.misses, lastStat.onosHits)
-				end
+                if lastStat.hits > 0 or lastStat.misses > 0 then
+                    lastAcc, lastAccOnos = CHUDGetAccuracy(lastStat.hits, lastStat.misses, lastStat.onosHits)
+                end
 
-				if hitssum > 0 or missessum > 0 then
-					currentAcc, currentAccOnos = CHUDGetAccuracy(hitssum, missessum, onossum)
-				end
+                if hitssum > 0 or missessum > 0 then
+                    currentAcc, currentAccOnos = CHUDGetAccuracy(hitssum, missessum, onossum)
+                end
 
-				if lastStat.hits > 0 or lastStat.misses > 0 or lastStat.pdmg > 0 or lastStat.sdmg > 0 then
-					msg.lastAcc = lastAcc
-					msg.lastAccOnos = lastAccOnos
-					msg.currentAcc = currentAcc
-					msg.currentAccOnos = currentAccOnos
-					msg.pdmg = lastStat.pdmg
-					msg.sdmg = lastStat.sdmg
-					msg.kills = lastStat.kills
-					msg.parasites = lastStat.parasites
-					msg.medsReceived = lastStat.medsReceived
-					msg.marineRtDamage = lastStat.marineRtDamage
-					msg.alienRtDamage = lastStat.alienRtDamage
-					msg.aliveFor = roundNumber((Shared.GetTime() - lastStat.aliveFor) / 60, 2)
-					msg.mapCheck = lastStat.mapCheck
-					--print("Current time: " .. tostring(Shared.GetTime()))
-					--print("born time: " .. tostring(lastStat.aliveFor))
-					--print("Dump LastStats: " .. dump(msg))
-					Server.SendNetworkMessage(Server.GetOwner(self), "DeathStats", msg, true)
-				end
-			end
+                if lastStat.hits > 0 or lastStat.misses > 0 or lastStat.pdmg > 0 or lastStat.sdmg > 0 then
+                    msg.lastAcc = lastAcc
+                    msg.lastAccOnos = lastAccOnos
+                    msg.currentAcc = currentAcc
+                    msg.currentAccOnos = currentAccOnos
+                    msg.pdmg = lastStat.pdmg
+                    msg.sdmg = lastStat.sdmg
+                    msg.kills = lastStat.kills
+                    msg.parasites = lastStat.parasites
+                    msg.medsReceived = lastStat.medsReceived
+                    msg.marineRtDamage = lastStat.marineRtDamage
+                    msg.alienRtDamage = lastStat.alienRtDamage
+                    msg.aliveFor = roundNumber((Shared.GetTime() - lastStat.aliveFor) / 60, 2)
+                    msg.mapCheck = lastStat.mapCheck
+                    -- print("Current time: " .. tostring(Shared.GetTime()))
+                    -- print("born time: " .. tostring(lastStat.aliveFor))
+                    -- print("Dump LastStats: " .. dump(msg))
+                    Server.SendNetworkMessage(Server.GetOwner(self), "DeathStats", msg, true)
+                end
+            end
 
-			StatsUI_ResetLastLifeStats(steamId)
-		end
+            StatsUI_ResetLastLifeStats(steamId)
+        end
 
-		local targetTeam = self.GetTeamNumber and self:GetTeamNumber() or 0
+        local targetTeam = self.GetTeamNumber and self:GetTeamNumber() or 0
 
-		-- Now save the attacker weapon
-		local killerSteamId, killerWeapon, killerTeam = StatsUI_GetAttackerWeapon(killer, doer)
+        -- Now save the attacker weapon
+        local killerSteamId, killerWeapon, killerTeam = StatsUI_GetAttackerWeapon(killer, doer)
 
-		if not self.isHallucination then
-			if killerSteamId and killerTeam ~= targetTeam then
-				StatsUI_AddWeaponKill(killerSteamId, killerWeapon, killerTeam)
-			end
-			-- If there's a teamkill or a death by natural causes, award the kill to the other team
-			if killerTeam == targetTeam or killerTeam == nil then
-				if targetTeam == 1 then
-					killerTeam = 2
-				else
-					killerTeam = 1
-				end
-			end
+        if not self.isHallucination then
+            if killerSteamId and killerTeam ~= targetTeam then
+                StatsUI_AddWeaponKill(killerSteamId, killerWeapon, killerTeam)
+            end
+            -- If there's a teamkill or a death by natural causes, award the kill to the other team
+            if killerTeam == targetTeam or killerTeam == nil then
+                if targetTeam == 1 then
+                    killerTeam = 2
+                else
+                    killerTeam = 1
+                end
+            end
 
-			StatsUI_AddTeamGraphKill(killerTeam, killer, self, killerWeapon, doer)
-		end
-	end
+            StatsUI_AddTeamGraphKill(killerTeam, killer, self, killerWeapon, doer)
+        end
+    end
 end
 
 -- Initialize the arrays
@@ -1368,97 +1396,90 @@ StatsUI_ResetStats()
 
 -- MY extra functions etc
 function StatsUI_RegisterPurchase(TechId)
-	--print("TechId purchase: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
-	if not GetGamerules():GetGameStarted() then
-		return
-	end
-	local eal_entry = {}
-	eal_entry.name = EnumToString(kTechId, TechId)
-	eal_entry.destroyed = false
-	if eal_entry.name then
-		table.insert(STATS_EquipmentAndLifeforms, eal_entry)
-	end
-	--print("RegisterPurchase: " .. dump(eal_entry))
-	--print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
+    -- print("TechId purchase: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
+    if not GetGamerules():GetGameStarted() then
+        return
+    end
+    local eal_entry = {}
+    eal_entry.name = EnumToString(kTechId, TechId)
+    eal_entry.destroyed = false
+    if eal_entry.name then
+        table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+    end
+    -- print("RegisterPurchase: " .. dump(eal_entry))
+    -- print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
 end
 
 function StatsUI_RegisterLost(TechId)
-	--print("TechId lost: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
-	if not GetGamerules():GetGameStarted() then
-		return
-	end
-	local eal_entry = {}
-	eal_entry.name = EnumToString(kTechId, TechId)
-	eal_entry.destroyed = true
-	if eal_entry.name then
-		table.insert(STATS_EquipmentAndLifeforms, eal_entry)
-	end
-	--print("RegisterLoss: " .. dump(eal_entry))
-	--print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
+    -- print("TechId lost: " .. EnumToString(kTechId, TechId) .. " (".. tostring(TechId) .. ")")
+    if not GetGamerules():GetGameStarted() then
+        return
+    end
+    local eal_entry = {}
+    eal_entry.name = EnumToString(kTechId, TechId)
+    eal_entry.destroyed = true
+    if eal_entry.name then
+        table.insert(STATS_EquipmentAndLifeforms, eal_entry)
+    end
+    -- print("RegisterLoss: " .. dump(eal_entry))
+    -- print("RegDump: " .. dump(STATS_EquipmentAndLifeforms))
 end
 
 function StatsUI_RegisterTSS(TechName, msg)
-	if not (GetGamerules():GetGameStarted() and msg.steamId and msg.steamId > 0) then
-		return
-	end
+    if not (GetGamerules():GetGameStarted() and msg.steamId and msg.steamId > 0) then
+        return
+    end
 
-	if not STATS_TeamSpecificStats[TechName] then
-		STATS_TeamSpecificStats[TechName] = {}
-	end
+    if not STATS_TeamSpecificStats[TechName] then
+        STATS_TeamSpecificStats[TechName] = {}
+    end
 
-	if not STATS_TeamSpecificStats[TechName][msg.steamId] then
-		STATS_TeamSpecificStats[TechName][msg.steamId] = {}
-		STATS_TeamSpecificStats[TechName][msg.steamId] = msg.Value
-	else
-		STATS_TeamSpecificStats[TechName][msg.steamId] = STATS_TeamSpecificStats[TechName][msg.steamId] + msg.Value
-	end
+    if not STATS_TeamSpecificStats[TechName][msg.steamId] then
+        STATS_TeamSpecificStats[TechName][msg.steamId] = {}
+        STATS_TeamSpecificStats[TechName][msg.steamId] = msg.Value
+    else
+        STATS_TeamSpecificStats[TechName][msg.steamId] = STATS_TeamSpecificStats[TechName][msg.steamId] + msg.Value
+    end
 
-	--Handle lastStats
-	if STATS_ClientStats[msg.steamId] and STATS_ClientStats[msg.steamId]["last"] then
-		if TechName == "Parasite" then
-			STATS_ClientStats[msg.steamId]["last"].parasites = STATS_ClientStats[msg.steamId]["last"].parasites + msg.Value
-		end
+    -- Handle lastStats
+    if STATS_ClientStats[msg.steamId] and STATS_ClientStats[msg.steamId]["last"] then
+        if TechName == "Parasite" then
+            STATS_ClientStats[msg.steamId]["last"].parasites = STATS_ClientStats[msg.steamId]["last"].parasites + msg.Value
+        end
 
-		if TechName == "MarineMedsReceived" then
-			STATS_ClientStats[msg.steamId]["last"].medsReceived = STATS_ClientStats[msg.steamId]["last"].medsReceived + msg.Value
-		end
+        if TechName == "MarineMedsReceived" then
+            STATS_ClientStats[msg.steamId]["last"].medsReceived = STATS_ClientStats[msg.steamId]["last"].medsReceived + msg.Value
+        end
 
-		if TechName == "marineRtDamage" then
-			STATS_ClientStats[msg.steamId]["last"].marineRtDamage = STATS_ClientStats[msg.steamId]["last"].marineRtDamage + msg.Value
-		end
+        if TechName == "marineRtDamage" then
+            STATS_ClientStats[msg.steamId]["last"].marineRtDamage = STATS_ClientStats[msg.steamId]["last"].marineRtDamage + msg.Value
+        end
 
-		if TechName == "alienRtDamage" then
-			STATS_ClientStats[msg.steamId]["last"].alienRtDamage = STATS_ClientStats[msg.steamId]["last"].alienRtDamage + msg.Value
-		end
-	end
-	--print("TechName: " .. TechName)
-	--print("- SteamID      : " .. msg.steamId)
-	--print("- Value        : " .. tostring(msg.Value))
-	--print("- Current value: " .. tostring(STATS_TeamSpecificStats[TechName][msg.steamId]))
+        if TechName == "alienRtDamage" then
+            STATS_ClientStats[msg.steamId]["last"].alienRtDamage = STATS_ClientStats[msg.steamId]["last"].alienRtDamage + msg.Value
+        end
+    end
+    -- print("TechName: " .. TechName)
+    -- print("- SteamID      : " .. msg.steamId)
+    -- print("- Value        : " .. tostring(msg.Value))
+    -- print("- Current value: " .. tostring(STATS_TeamSpecificStats[TechName][msg.steamId]))
 end
 
-local STATS_PresGraph = {}
 function STATSUI_PresGraphAliens(presUnused, presEquipped, rtAmount, playerCount)
-	table.insert(
-		STATS_PresGraphAliens,
-		{
-			presUnused = presUnused,
-			rtAmount = rtAmount,
-			presEquipped = presEquipped,
-			gameMinute = GetGameTime(true),
-			playerCount = playerCount -- doesnt count the commander
-		}
-	)
+    table.insert(STATS_PresGraphAliens, {
+        presUnused = presUnused,
+        presEquipped = presEquipped,
+        rtAmount = rtAmount,
+		gameMinute = GetGameTime(true),
+        playerCount = playerCount -- does not count the commander
+    })
 end
 function STATSUI_PresGraphMarines(presUnused, presEquipped, rtAmount, playerCount)
-	table.insert(
-		STATS_PresGraphMarines,
-		{
-			presUnused = presUnused,
-			rtAmount = rtAmount,
-			presEquipped = presEquipped,
-			gameMinute = GetGameTime(true),
-			playerCount = playerCount -- doesnt count the commander
-		}
-	)
+    table.insert(STATS_PresGraphMarines, {
+        presUnused = presUnused,
+        presEquipped = presEquipped,
+        rtAmount = rtAmount,
+		gameMinute = GetGameTime(true),
+        playerCount = playerCount -- does not count the commander
+    })
 end

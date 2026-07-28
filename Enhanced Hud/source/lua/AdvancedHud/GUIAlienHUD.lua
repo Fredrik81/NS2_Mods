@@ -35,6 +35,8 @@ local function EnsureHydraIndicatorFrame(self)
 
     if self.babblerIndicationFrame then
         self.babblerIndicationFrame:AddChild(self.hydraIndicationFrame)
+        -- Adjust the position of babbler frame to make room for hydra indicators above it
+        self.babblerIndicationFrame:SetPosition(self.babblerIndicationFrame:GetPosition() + Vector(0, kHydraSlotSize + GUIScale(-10), 0))
         self.hydraIndicationFrame:SetPosition(kHydraIndicatorOffset)
     end
 end

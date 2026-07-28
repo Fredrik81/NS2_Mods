@@ -189,8 +189,8 @@ local kAvatarFrameTexture = PrecacheAsset("ui/thunderdome/roledisplay_avatar_fra
 local kEalAlienTexture = PrecacheAsset("ui/Devnull_IPS/Alien.dds")
 local kEalMarineArmoryTexture = PrecacheAsset("ui/Devnull_IPS/Marine.dds")
 local kIpsBackgroundGeneric = PrecacheAsset("ui/Devnull_IPS/bg_generic.dds")
-local kIpsBackgroundAliens = PrecacheAsset("ui/Devnull_IPS/bg_alien_" .. tostring(math.random(1, 3)) .. ".dds")
-local kIpsBackgroundMarines = PrecacheAsset("ui/Devnull_IPS/bg_marines_" .. tostring(math.random(1, 3)) .. ".dds")
+local kIpsBackgroundAliens = PrecacheAsset("ui/Devnull_IPS/bg_alien_" .. tostring(math.random(1, 5)) .. ".dds")
+local kIpsBackgroundMarines = PrecacheAsset("ui/Devnull_IPS/bg_marine_" .. tostring(math.random(1, 5)) .. ".dds")
 -- local kSmurfAvatarTexture = PrecacheAsset("ui/smurf_avatar.dds")
 local kCommBadgeTexture = PrecacheAsset("ui/badges/commander_20.dds")
 local kCommSkillIconTexture = PrecacheAsset("ui/Devnull_IPS/ComSkillBadges.dds")
@@ -1965,6 +1965,20 @@ function GUIGameEndStats:SaveLastRoundStats()
         savedStats.statusSummaryTable = statusSummaryTable
         savedStats.techLogTable = techLogTable
 
+        -- sort before saving, so we can use the same order when loading
+        table.sort(rtGraphTable, function(a, b)
+            return a.gameMinute < b.gameMinute
+        end)
+        table.sort(killGraphTable, function(a, b)
+            return a.gameMinute < b.gameMinute
+        end)
+        table.sort(presGraphTableMarines, function(a, b)
+            return a.gameMinute < b.gameMinute
+        end)
+        table.sort(presGraphTableAliens, function(a, b)
+            return a.gameMinute < b.gameMinute
+        end)
+
         savedStats.presGraphTableMarines = presGraphTableMarines
         savedStats.presGraphTableAliens = presGraphTableAliens
 
@@ -2294,8 +2308,6 @@ function GUIGameEndStats:Initialize()
     self.rtGraphTextShadow:SetLayer(kGUILayerMainMenu)
     self.background:AddChild(self.rtGraphTextShadow)
 
-    -- commented out for LessNetworkData
-    --[[
     self.presGraphTextShadow = GUIManager:CreateTextItem()
     self.presGraphTextShadow:SetStencilFunc(GUIItem.NotEqual)
     self.presGraphTextShadow:SetFontName(kTitleFontName)
@@ -2322,7 +2334,6 @@ function GUIGameEndStats:Initialize()
     self.presGraphText:SetPosition(Vector(-kTextShadowOffset, -kTextShadowOffset, 0))
     self.presGraphText:SetLayer(kGUILayerMainMenu)
     self.presGraphTextShadow:AddChild(self.presGraphText)
-    ]]
 
     self.rtGraphText = GUIManager:CreateTextItem()
     self.rtGraphText:SetStencilFunc(GUIItem.NotEqual)
@@ -2434,8 +2445,6 @@ function GUIGameEndStats:Initialize()
     self.killGraph:StartLine(kTeam1Index, kBlueColor)
     self.killGraph:StartLine(kTeam2Index, kRedColor)
 
-    -- commented out for LessNetworkData
-    --[[
     self.presGraph = {}
     self.presGraph = LineGraph()
     self.presGraph:Initialize()
@@ -2449,20 +2458,19 @@ function GUIGameEndStats:Initialize()
     self.presGraph:SetStencilFunc(GUIItem.NotEqual)
 
     self.presGraph:StartLine(1, kBlueColor)
-    --self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
+    -- self.presGraph:StartLine(2, Color(0.22 , 0.46 , 0.66, 1))
     self.presGraph:StartLine(3, kRedColor)
-    --self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
+    -- self.presGraph:StartLine(4, Color(0.66 , 0.4 , 0.13, 1))
     -- kBlueColor = Color(0, 0.6117, 1, 1)
     -- kRedColor = Color(1, 0.4941, 0, 1)
     self.presGraph:StartLine(2, Color(0.12, 0.30, 0.66, 1))
     self.presGraph:StartLine(4, Color(0.66, 0.2, 0.2, 1))
 
-    self.presGraphText.tooltip = "Aliens:\nOrange: pres of currently living lifeforms\nRed: unused pres AND currently living lifeforms\n\nMarines:\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
+    self.presGraphText.tooltip =
+        "Aliens:\nOrange: pres of currently living lifeforms\nRed: unused pres AND currently living lifeforms\n\nMarines:\nLightblue: current equipment on marines or ground\nBlue: unused pres AND current equipment on marines or ground"
     self.presGraph.graphBackground.tooltip = self.presGraphText.tooltip
     table.insert(self.toolTipCards, self.presGraphText)
     table.insert(self.toolTipCards, self.presGraph.graphBackground)
-
-    ]]
 
     self.builtRTsComp = ComparisonBarGraph()
     self.builtRTsComp:Initialize()
@@ -2734,8 +2742,6 @@ function GUIGameEndStats:RepositionStats()
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
 
-    -- commented out for LessNetworkData
-    --[[
     local showpresGraph = self.presGraphs and #self.presGraphs > 0 or false
     self.presGraphTextShadow:SetIsVisible(showpresGraph)
     self.presGraph:SetIsVisible(showpresGraph)
@@ -2746,7 +2752,6 @@ function GUIGameEndStats:RepositionStats()
         self.presGraph:SetPosition(Vector((kTitleSize.x - rtGraphSize.x) / 2, yPos, 0))
         yPos = yPos + rtGraphSize.y + GUILinearScale(72)
     end
-    ]]
 
     self.contentSize = math.max(self.contentSize, yPos)
 end
@@ -4574,16 +4579,10 @@ function GUIGameEndStats:ProcessStats()
 	end
 	]]
 
-    -- commented out for LessNetworkData
-    --[[
-
     local function getPresGraphPoints(teamNumber, presTable, graphCeiling, equippedGraph, totalGraph)
-        table.sort(
-            presTable,
-            function(a, b)
-                return a.gameMinute < b.gameMinute
-            end
-        )
+        table.sort(presTable, function(a, b)
+            return a.gameMinute < b.gameMinute
+        end)
 
         local nextGameSecond
         local gameLength = miscDataTable.gameLengthMinutes
@@ -4665,8 +4664,6 @@ function GUIGameEndStats:ProcessStats()
         self.presGraph:SetXGridSpacing(xSpacing)
     end
 
-    ]]
-
     self:RepositionStats()
 
     pcall(self.SaveLastRoundStats, self)
@@ -4691,9 +4688,8 @@ function GUIGameEndStats:ProcessStats()
     DIPS_MarineCommID = nil
     DIPS_EnahncedStats = false
 
-    -- commented out for LessNetworkData
-    -- presGraphTableAliens = {}
-    -- presGraphTableMarines = {}
+    presGraphTableAliens = {}
+    presGraphTableMarines = {}
 end
 
 function CalculateAverageRTs(rtGraphTable, gameLengthMinutes)
@@ -4875,7 +4871,7 @@ local function CHUDSetWeaponStats(message)
     table.insert(cardEntry.rows, row)
 
     if message.accuracy > 0 then
-        row = {}
+        local row = {}
         row.title = "Accuracy"
         row.value = round(message.accuracy, 0) .. "%"
         table.insert(cardEntry.rows, row)
@@ -5072,12 +5068,80 @@ local function CHUDSetRTGraph(message)
     lastStatsMsg = Shared.GetTime()
 end
 
+local function CHUDSetRTGraphData(message)
+    if message and message.data then
+        local compressedData = message.data
+
+        for entry in string.gmatch(message.data, "[^;]+") do
+            local teamStr, minuteStr, destroyedStr = string.match(entry, "([^,]+),([^,]+),([^,]+)")
+
+            if teamStr and minuteStr and destroyedStr then
+                table.insert(rtGraphTable, {
+                    teamNumber = tonumber(teamStr),
+                    gameMinute = tonumber(minuteStr),
+                    destroyed = (destroyedStr == "1")
+                })
+            end
+        end
+    end
+
+    lastStatsMsg = Shared.GetTime()
+end
+
+local function CHUDSetPresGraphData(message)
+    if message and message.data and message.teamNumber then
+        if message.teamNumber ~= kMarineTeamType and message.teamNumber ~= kAlienTeamType then
+            print("Invalid team number received in CHUDSetPresGraphData: " .. tostring(message.teamNumber))
+            return
+        end
+
+        local compressedData = message.data
+        local row = {}
+
+        for entry in string.gmatch(message.data, "[^;]+") do
+            local entryValues = {string.match(entry, "([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)")}
+            row = {}
+            row.gameMinute = tonumber(entryValues[1])
+            row.presUnused = tonumber(entryValues[2])
+            row.presEquipped = tonumber(entryValues[3])
+            row.rtAmount = tonumber(entryValues[4])
+            row.playerCount = tonumber(entryValues[5])
+
+            if message.teamNumber == 1 then
+                table.insert(presGraphTableMarines, row)
+            elseif message.teamNumber == 2 then
+                table.insert(presGraphTableAliens, row)
+            end
+        end
+    end
+
+    lastStatsMsg = Shared.GetTime()
+end
+
 local function CHUDSetKillGraph(message)
     if message and message.gameMinute then
         local entry = {}
         entry.teamNumber = message.killerTeamNumber
         entry.gameMinute = message.gameMinute
         table.insert(killGraphTable, entry)
+    end
+
+    lastStatsMsg = Shared.GetTime()
+end
+
+local function CHUDSetKillGraphData(message)
+    if message and message.data then
+        local compressedData = message.data
+        for entry in string.gmatch(message.data, "[^;]+") do
+            local minuteStr, teamStr = string.match(entry, "([^,]+),([^,]+)")
+
+            if teamStr and minuteStr then
+                table.insert(killGraphTable, {
+                    gameMinute = tonumber(minuteStr),
+                    teamNumber = tonumber(teamStr)
+                })
+            end
+        end
     end
 
     lastStatsMsg = Shared.GetTime()
@@ -5362,30 +5426,11 @@ Client.HookNetworkMessage("MarineCommStats", CHUDSetCommStats)
 Client.HookNetworkMessage("GlobalCommStats", CHUDSetGlobalCommStats)
 Client.HookNetworkMessage("HiveSkillGraph", CHUDSetHiveSkillGraph)
 Client.HookNetworkMessage("RTGraph", CHUDSetRTGraph)
+Client.HookNetworkMessage("RTGraphData", CHUDSetRTGraphData)
+Client.HookNetworkMessage("presGraphData", CHUDSetPresGraphData)
 Client.HookNetworkMessage("KillGraph", CHUDSetKillGraph)
+Client.HookNetworkMessage("KillGraphData", CHUDSetKillGraphData)
 Client.HookNetworkMessage("TechLog", CHUDSetTechLog)
 Client.HookNetworkMessage("BuildingSummary", CHUDSetBuildingSummary)
 Client.HookNetworkMessage("EalStats", CHUDEquipmentAndLifeformsLog)
 Client.HookNetworkMessage("TeamSpecificStats", CHUDTeamSpecificStatsLog)
-
--- commented out for LessNetworkData
---[[
-
-local function CHUDPresGraphAliens(message)
-    if message and message.gameMinute then
-        table.insert(presGraphTableAliens, message)
-    end
-    lastStatsMsg = Shared.GetTime()
-end
-Client.HookNetworkMessage("PresGraphStatsAliens", CHUDPresGraphAliens)
-
--- presGraph Mod
-local function CHUDPresGraphMarines(message)
-    if message and message.gameMinute then
-        table.insert(presGraphTableMarines, message)
-    end
-    lastStatsMsg = Shared.GetTime()
-end
-Client.HookNetworkMessage("PresGraphStatsMarines", CHUDPresGraphMarines)
-
-]]

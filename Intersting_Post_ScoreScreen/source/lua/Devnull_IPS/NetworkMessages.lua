@@ -1,5 +1,4 @@
---HPrint("=========Loaded NetworkMessages.lua hook==============")
-
+-- HPrint("=========Loaded NetworkMessages.lua hook==============")
 local kEalStats = {
     name = string.format("string (%d)", 20),
     buyCount = "integer",
@@ -54,7 +53,7 @@ local kDeathStatsMessage = {
     medsReceived = "integer",
     marineRtDamage = "float (0 to 524287 by 0.01)",
     alienRtDamage = "float (0 to 524287 by 0.01)",
-    aliveFor = "float (0 to 524287 by 0.01)", 
+    aliveFor = "float (0 to 524287 by 0.01)",
     mapCheck = "float (0 to 524287 by 0.01)"
 }
 Shared.RegisterNetworkMessage("DeathStats", kDeathStatsMessage)
@@ -65,29 +64,18 @@ local kMapCheckMessage = {
 }
 Shared.RegisterNetworkMessage("mapCheckTime", kMapCheckMessage)
 
-
-
---currently unused because of LessNetworkData
---[[
-local kPresGraphStatsMarines = {
-    presUnused = "float (0 to 3200 by 0.1)",
-    rtAmount = "integer (0 to 32)",
-    presEquipped = "float (0 to 3200 by 0.1)",
-    gameMinute = "float (0 to 524287 by 0.01)",
-    playerCount = "integer (0 to 32)"
+local kRTGraphData = {
+    data = "string (1024)"
 }
-Shared.RegisterNetworkMessage("PresGraphStatsMarines", kPresGraphStatsMarines)
-local kPresGraphStatsAliens = {
-    presUnused = "float (0 to 3200 by 0.1)",
-    rtAmount = "integer (0 to 32)",
-    presEquipped = "float (0 to 3200 by 0.1)",
-    gameMinute = "float (0 to 524287 by 0.01)",
-    playerCount = "integer (0 to 32)"
+Shared.RegisterNetworkMessage("RTGraphData", kRTGraphData)
+
+local kPresGraphMarinesData = {
+    teamNumber = "integer (1 to 2)",
+    data = "string (1024)"
 }
-Shared.RegisterNetworkMessage("PresGraphStatsAliens", kPresGraphStatsAliens)
+Shared.RegisterNetworkMessage("presGraphData", kPresGraphMarinesData)
 
-]]
-
-
-
-
+local kKillGraphData = {
+    data = "string (1024)"
+}
+Shared.RegisterNetworkMessage("KillGraphData", kKillGraphData)

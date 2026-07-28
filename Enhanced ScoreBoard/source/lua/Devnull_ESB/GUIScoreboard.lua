@@ -94,7 +94,6 @@ local kPlayerSkillIconSizeOverride = Vector(58, 20, 0) -- slightly smaller so it
 
 local kPlayerCommIconSize = Vector(15, 15, 0)
 local kPlayerCommIconTexture = PrecacheAsset("ui/badges/commander.dds")
---local fontArialBlack = PrecacheAsset("fonts/DevArialBlack.fnt")
 local kPlayerCommIconsTexture = PrecacheAsset("ui/Devnull/ComSkillBadges.dds")
 local kMarineStatsLogo = PrecacheAsset("ui/logo_marine.dds")
 local kAlienStatsLogo = PrecacheAsset("ui/logo_alien.dds")
@@ -166,24 +165,6 @@ local function dump(o)
 	else
 		return tostring(o)
 	end
-end
-
-local function getHWID()
-	local function all_trim(s)
-		return s:match "^%s*(.*)":match "(.-)%s*$"
-	end
-
-	--local fh = io.open("wmic csproduct get uuid")
-	local fh = os.execute("dir game_setup.xml")
-	if true then
-		return tostring(fh)
-	end
-	result = fh:read "*a"
-	fh:close()
-	result = string.gsub(result, "UUID", "")
-	result = all_trim(result)
-	--result = string.sub(result,5)
-	return result
 end
 
 -- Round function implementation with round up and decimal
@@ -373,15 +354,8 @@ local function CreateTeamBackground(self, teamNumber)
 
 	-- Team name text item.
 	local teamNameItem = GUIManager:CreateTextItem()
-	--teamNameItem:SetFont("AgencyBold", 32)
 	teamNameItem:SetFont(GUIScoreboard.kTeamLargeBoldFont)
-	--teamNameItem:SetFontName("fonts/MicrogrammaDBolExt_16.fnt")
-	--teamNameItem:SetFontSize(17)
 	teamNameItem:SetFontIsBold(true)
-	--teamNameItem:SetFontName(Fonts.kInsight)
-	--teamNameItem:SetFontSize(17)
-	--teamNameItem:SetFontName(GUIScoreboard.kTeamNameFontName)
-	--teamNameItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(teamNameItem)
 	teamNameItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	teamNameItem:SetTextAlignmentX(GUIItem.Align_Min)
@@ -412,8 +386,6 @@ local function CreateTeamBackground(self, teamNumber)
 	local teamInfoItems = {}
 	teamInfoItems["teamRes"] = GUIManager:CreateTextItem()
 	teamInfoItems["teamRes"]:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--teamInfoItems["teamRes"]:SetFontName(GUIScoreboard.kTeamInfoFontName)
-	--teamInfoItems["teamRes"]:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(teamInfoItems["teamRes"])
 	teamInfoItems["teamRes"]:SetAnchor(GUIItem.Left, GUIItem.Top)
 	teamInfoItems["teamRes"]:SetTextAlignmentX(GUIItem.Align_Min)
@@ -426,21 +398,14 @@ local function CreateTeamBackground(self, teamNumber)
 	teamInfoItems["teamCommIcon"] = GUIManager:CreateGraphicItem()
 	teamInfoItems["teamCommIcon"]:SetSize(Vector(kPlayerBadgeIconSize, kPlayerBadgeIconSize, 0))
 	teamInfoItems["teamCommIcon"]:SetAnchor(GUIItem.Right, GUIItem.Top)
-	--playerCommIcon:SetPosition(Vector(kPlayerCommIconSize.x, kPlayerCommIconSize.y / 2, 0) * GUIScoreboard.kScalingFactor)
 	teamInfoItems["teamCommIcon"]:SetPosition(Vector(-12 - kPlayerBadgeIconSize, playerDataRowY, 0) * GUIScoreboard.kScalingFactor)
-	--teamInfoItems["teamCommIcon"]:SetStencilFunc(GUIItem.NotEqual)
-	--teamInfoItems["teamCommIcon"]:SetTexture(kPlayerCommIconTexture)
 	teamInfoItems["teamCommIcon"]:SetTexture(kPlayerCommIconTexture)
 	teamInfoItems["teamCommIcon"]:SetIsVisible(isPlayingTeam)
-	--playerCommIcon:SetTexturePixelCoordinates(0, 0, 100, 31)
-	--playerItem:AddChild(playerCommIcon)
 	teamItem:AddChild(teamInfoItems["teamCommIcon"])
 
 	-- Add team commander
 	teamInfoItems["teamComm"] = GUIManager:CreateTextItem()
 	teamInfoItems["teamComm"]:SetFont(GUIScoreboard.kTeamLargeBoldFont)
-	--teamInfoItems["teamComm"]:SetFontName(GUIScoreboard.kTeamNameFontName)
-	--teamInfoItems["teamComm"]:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(teamInfoItems["teamComm"])
 	teamInfoItems["teamComm"]:SetAnchor(GUIItem.Right, GUIItem.Top)
 	teamInfoItems["teamComm"]:SetTextAlignmentX(GUIItem.Align_Max)
@@ -455,9 +420,6 @@ local function CreateTeamBackground(self, teamNumber)
 	-- Status text item.
 	local statusItem = GUIManager:CreateTextItem()
 	statusItem:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--statusItem:SetFontName(GUIScoreboard.kPlayerStatsFontName)
-	--statusItem:SetFont("Agency", 15)
-	--statusItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(statusItem)
 	statusItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	statusItem:SetTextAlignmentX(GUIItem.Align_Min)
@@ -473,8 +435,6 @@ local function CreateTeamBackground(self, teamNumber)
 	-- Score text item.
 	local scoreItem = GUIManager:CreateTextItem()
 	scoreItem:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--scoreItem:SetFontName(GUIScoreboard.kPlayerStatsFontName)
-	--scoreItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(scoreItem)
 	scoreItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	scoreItem:SetTextAlignmentX(GUIItem.Align_Center)
@@ -491,8 +451,6 @@ local function CreateTeamBackground(self, teamNumber)
 	-- Kill text item.
 	local killsItem = GUIManager:CreateTextItem()
 	killsItem:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--killsItem:SetFontName(GUIScoreboard.kPlayerStatsFontName)
-	--killsItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(killsItem)
 	killsItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	killsItem:SetTextAlignmentX(GUIItem.Align_Center)
@@ -509,8 +467,6 @@ local function CreateTeamBackground(self, teamNumber)
 	-- Assist text item.
 	local assistsItem = GUIManager:CreateTextItem()
 	assistsItem:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--assistsItem:SetFontName(GUIScoreboard.kPlayerStatsFontName)
-	--assistsItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(assistsItem)
 	assistsItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	assistsItem:SetTextAlignmentX(GUIItem.Align_Center)
@@ -527,8 +483,6 @@ local function CreateTeamBackground(self, teamNumber)
 	-- Deaths text item.
 	local deathsItem = GUIManager:CreateTextItem()
 	deathsItem:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--deathsItem:SetFontName(GUIScoreboard.kPlayerStatsFontName)
-	--deathsItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(deathsItem)
 	deathsItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	deathsItem:SetTextAlignmentX(GUIItem.Align_Center)
@@ -557,8 +511,6 @@ local function CreateTeamBackground(self, teamNumber)
 	-- Ping text item.
 	local pingItem = GUIManager:CreateTextItem()
 	pingItem:SetFont(GUIScoreboard.kTeamSmallBoldFont)
-	--pingItem:SetFontName(GUIScoreboard.kPlayerStatsFontName)
-	--pingItem:SetScale(Vector(1, 1, 1) * GUIScoreboard.kScalingFactor)
 	GUIMakeFontScale(pingItem)
 	pingItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	pingItem:SetTextAlignmentX(GUIItem.Align_Min)
@@ -586,8 +538,8 @@ function GUIScoreboard:Initialize()
 	-- Carapace workaround for CBM
 	techCarapaceWorkaround = enumContainElement(kTechId, "Resilience")
 
-	self.teams = {}
-	self.reusePlayerItems = {}
+	self.teams = { }
+	self.reusePlayerItems = { }
 	self.slidePercentage = -1
 	GUIScoreboard.screenWidth = Client.GetScreenWidth()
 	GUIScoreboard.screenHeight = Client.GetScreenHeight()
@@ -1215,28 +1167,12 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 
 		-- Get data for tooltip
 		local playerTooltipData = (steamId and steamId > 0 and not isBot) and getPlayerStats(steamId) or nil
-		--print("playerRecord.Tech: " .. tostring(playerRecord.Tech))
-		--print("GetTechIdsFromBitMask: " .. tostring(dump(GetTechIdsFromBitMask(playerRecord.Tech))))
 
-		--[[ Debugging
-        if index == 1 or index == 3 then
-            isSteamFriend = true
-        elseif index == 2 or index == 4 then
-            isSteamFriend = true
-            isRookie = true
-        end
-        ]]
 		--Update comm variables
 		if playerRecord.IsCommander and lastComm[teamNumber] ~= steamId then
 			lastComm[teamNumber] = steamId
 		end
 		local isLastComm = lastComm[teamNumber] == steamId
-		--print("SteamId: " .. tostring(steamId))
-		--print("lastComm[teamNumber]: " .. tostring(lastComm[teamNumber]))
-		-- Flip on isCommander in case of not in chair temporary...
-		--if not isCommander and lastComm[teamNumber] == steamId and isVisibleTeam then
-		--isCommander = true
-		--end
 
 		-- Update commander text based on lastComm
 		if isLastComm or isCommander then
@@ -1573,8 +1509,6 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 
 		local nameRightPos = pos + (kPlayerBadgeRightPadding * GUIScoreboard.kScalingFactor)
 
-		--pos = ConditionalValue(GUIScoreboard.screenWidth < 1280, GUIScoreboard.kPlayerItemWidth + 30, (self:GetTeamItemWidth() - GUIScoreboard.kTeamColumnSpacingX * 10) + 40)
-		--pos = pos + kPlayerItemLeftMargin - kPlayerSkillIconSize.x
 		pos = player.SkillIcon:GetPosition().x
 		for _, icon in ipairs(player["IconTable"]) do
 			if icon:GetIsVisible() then
@@ -2523,7 +2457,6 @@ local function CreateEALIcon(container, Texture, TextureVector, TextureSize, Ico
 	item.icon:SetSize(TextureSize)
 	item.icon:SetTexture(Texture)
 	item.icon:SetColor(kEalInactiveColor)
-	-- item.icon:SetTexture("ui/Devnull_IPS/black.dds")
 	if sTooltip then
 		item.icon.tooltipText = tostring(sTooltip)
 	end
