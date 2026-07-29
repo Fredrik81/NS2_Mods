@@ -169,6 +169,7 @@ end
 
 -- Round function implementation with round up and decimal
 local function round(number, decimals)
+	PROFILE("ESB:round")
 	if number and IsNumber(number) then
 		if decimals > 0 then
 			decimals = 10 ^ decimals
@@ -186,6 +187,7 @@ local function round(number, decimals)
 end
 
 local function humanNumber(number)
+	PROFILE("ESB:humanNumber")
 	if number and IsNumber(number) then
 		if number > 1000000 then
 			number = number / 10000
@@ -211,35 +213,17 @@ local function myPrint(string)
 	end
 end
 
-local function tblIndexSortSubValue(tbl, subvalue)
-	local idx = {}
-	for i = 1, #tbl do
-		idx[i] = i
-	end -- build a table of indexes
-	-- sort the indexes, but use the values as the sorting criteria
-	table.sort(
-		idx,
-		function(a, b)
-			return tbl[a][subvalue] > tbl[b][subvalue]
-		end
-	)
-	-- return the sorted indexes
-	return (table.unpack or unpack)(idx)
-end
-
 local function fetchPlayerStats(steamId)
 	if not steamId then
 		return
 	end
 
+	PROFILE("ESB:fetchPlayerStats")
+
 	if globalFetchTime + 15 > Shared.GetTime() then
 		return
 	end
 	globalFetchTime = Shared.GetTime() -- adding this to spam less code
-
-	if Client.GetSteamId() == 74660439 or Client.GetSteamId() == 77470693 then
-	--fetchUrl = "https://ns2panel.com/api/stats/players?ids=%s"
-	end
 
 	local usersToFetch = nil
 	for i, user in ipairs(steamId) do
@@ -256,8 +240,6 @@ local function fetchPlayerStats(steamId)
 
 	if usersToFetch then
 		usersToFetch = usersToFetch
-		--myPrint("Requesting ns2panel data for: " .. usersToFetch)
-		--myPrint(string.format(fetchUrl, usersToFetch))
 		Shared.SendHTTPRequest(
 			string.format(fetchUrl, usersToFetch),
 			"GET",
@@ -270,13 +252,8 @@ local function fetchPlayerStats(steamId)
 				if tdata then
 					for index, value in ipairs(tdata) do
 						if value and value.marine_skill and value.steam_id then
-							--playerStatsTable[746604391] = value
-							--myPrint("Recived data for: " .. tostring(value.steam_id))
 							playerStatsTable[value.steam_id] = value
 							playerStatsTable[value.steam_id].fetched = 1
-						else
-							--myPrint("Recived bad-data for: " .. tostring(value.steam_id))
-							--myPrint("DATA: " .. dump(value))
 						end
 					end
 				end
@@ -286,6 +263,7 @@ local function fetchPlayerStats(steamId)
 end
 
 local function enumContainElement(enum, element)
+	PROFILE("ESB:enumContainElement")
 	for _, v in pairs(enum) do
 		if _ == element then
 			return true
@@ -307,6 +285,7 @@ local function getPlayerStats(steamId)
 end
 
 function GUIScoreboard:OnResolutionChanged(_, _, newX, _)
+	PROFILE("ESB:GUIScoreboard:OnResolutionChanged")
 	GUIScoreboard.screenWidth = newX
 
 	GUIScoreboard.kTeamColumnSpacingX = ConditionalValue(GUIScoreboard.screenWidth < 1280, 30, 40)
@@ -322,6 +301,7 @@ function GUIScoreboard:OnResolutionChanged(_, _, newX, _)
 end
 
 function GUIScoreboard:GetTeamItemWidth()
+	PROFILE("ESB:GUIScoreboard:GetTeamItemWidth")
 	if GUIScoreboard.screenWidth < 1280 then
 		return 608 -- 640 * 0.95
 	else
@@ -330,6 +310,7 @@ function GUIScoreboard:GetTeamItemWidth()
 end
 
 local function CreateTeamBackground(self, teamNumber)
+	PROFILE("ESB:CreateTeamBackground")
 	local color
 	local teamItem = GUIManager:CreateGraphicItem()
 	teamItem:SetStencilFunc(GUIItem.NotEqual)
@@ -531,7 +512,8 @@ local kBlockedMouseOverColor = Color(1, 1, 0, 1)
 local kBlockedColor = Color(1, 1, 1, 0.9)
 
 function GUIScoreboard:Initialize()
-	self.updateInterval = 0.2
+	PROFILE("ESB:GUIScoreboard:Initialize")
+	self.updateInterval = 0.3
 
 	self.visible = false
 
@@ -710,6 +692,7 @@ function GUIScoreboard:Initialize()
 end
 
 function GUIScoreboard:Uninitialize()
+	PROFILE("ESB:GUIScoreboard:Uninitialize")
 	for _, team in ipairs(self.teams) do
 		GUI.DestroyItem(team["GUIs"]["Background"])
 	end
@@ -748,6 +731,7 @@ function GUIScoreboard:Uninitialize()
 end
 
 local function SetMouseVisible(self, setVisible)
+	PROFILE("ESB:SetMouseVisible")
 	if self.mouseVisible ~= setVisible then
 		self.mouseVisible = setVisible
 
@@ -759,6 +743,7 @@ local function SetMouseVisible(self, setVisible)
 end
 
 local function HandleSlidebarClicked(self, _, mouseY)
+	PROFILE("ESB:HandleSlidebarClicked")
 	if self.slidebarBg:GetIsVisible() and self.isDragging then
 		local topPos = (GUIScoreboard.kGameTimeBackgroundSize.y + 6) + 19
 		local bottomPos = Client.GetScreenHeight() - (GUIScoreboard.kClickForMouseBackgroundSize.y + 5) - 19
@@ -768,6 +753,7 @@ local function HandleSlidebarClicked(self, _, mouseY)
 end
 
 local function GetIsVisibleTeam(teamNumber)
+	PROFILE("ESB:GetIsVisibleTeam")
 	local isVisibleTeam = false
 	local localPlayer = Client.GetLocalPlayer()
 	if localPlayer then
@@ -804,7 +790,7 @@ function GUIScoreboard:Update(deltaTime)
 	if lastScoreboardVisState ~= displayScoreboard then
 		lastScoreboardVisState = displayScoreboard
 		if vis == false then
-			self.updateInterval = 0.2
+			self.updateInterval = 0.3
 			self.badgeNameTooltip:Hide(0)
 		end
 	end
@@ -1017,6 +1003,7 @@ function GUIScoreboard:Update(deltaTime)
 end
 
 local function SetPlayerItemBadges(item, badgeTextures)
+	PROFILE("ESB:SetPlayerItemBadges")
 	assert(#badgeTextures <= #item.BadgeItems)
 
 	local offset = 0
@@ -1039,6 +1026,7 @@ local function SetPlayerItemBadges(item, badgeTextures)
 end
 
 local function GetCountByStatus(team, status, partof)
+	PROFILE("ESB:GetCountByStatus")
 	local count = 0
 	for index, item in ipairs(team) do
 		if partof and string.find(item["Status"], status) then
@@ -1051,6 +1039,7 @@ local function GetCountByStatus(team, status, partof)
 end
 
 function GUIScoreboard:UpdateTeam(updateTeam)
+	PROFILE("ESB:GUIScoreboard:UpdateTeam")
 	local teamGUIItem = updateTeam["GUIs"]["Background"]
 	local teamNameGUIItem = updateTeam["GUIs"]["TeamName"]
 	local teamSkillGUIItem = updateTeam["GUIs"]["TeamSkill"]
@@ -1163,7 +1152,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		if steamId == localPlayerSteamID and playerRecord.IsSpectator then
 			isSpectating = true
 		end
-		local playerCommSkillTier, playerCommSkillTierName = GetPlayerSkillTier(playerRecord.commSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
+		local playerCommSkillTier, playerCommSkillTierName = GetPlayerSkillTier(playerRecord.playerCommSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
 
 		-- Get data for tooltip
 		local playerTooltipData = (steamId and steamId > 0 and not isBot) and getPlayerStats(steamId) or nil
@@ -1362,8 +1351,54 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		if isBot then
 			player.SkillIcon.tooltipText = "NS2 Bot"
 		elseif not playerTooltipData then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
+			if isSpectator or isMarine or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
+			end
+			if isSpectator or isAlien or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
+			end
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+			if isSpectator or isLastComm or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
+			end
+			if isSpectator or isLastComm or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
+			end
+			if isSpectator or (isLastComm and isMarine) or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
+			end
+			if isSpectator or (isLastComm and isAlien) or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
+			end
+			if isSpectator or isLastComm or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+			end
 			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nRequesting NS2Panel data..."
 		elseif playerTooltipData and playerTooltipData.fetched and playerTooltipData.fetched == 0 then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
+			if isSpectator or isMarine or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
+			end
+			if isSpectator or isAlien or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
+			end
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+			if isSpectator or isLastComm or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
+			end
+			if isSpectator or isLastComm or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
+			end
+			if isSpectator or (isLastComm and isMarine) or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
+			end
+			if isSpectator or (isLastComm and isAlien) or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
+			end
+			if isSpectator or isLastComm or isPreGame then
+				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+			end
 			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nNo NS2Panel data!"
 		elseif not isBot and playerTooltipData and playerTooltipData.marine_skill then
 			--local midPlayerSkill = ((playerRecord.marineSkill or 0) + (playerRecord.alienSkill or 0)) / 2
@@ -1886,6 +1921,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 end
 
 function GUIScoreboard:ResizePlayerList(playerList, numPlayers, teamGUIItem)
+	PROFILE("ESB:GUIScoreboard:ResizePlayerList")
 	while table.icount(playerList) > numPlayers do
 		teamGUIItem:RemoveChild(playerList[1]["Background"])
 		playerList[1]["Background"]:SetIsVisible(false)
@@ -1902,6 +1938,7 @@ function GUIScoreboard:ResizePlayerList(playerList, numPlayers, teamGUIItem)
 end
 
 function GUIScoreboard:CreatePlayerItem()
+	PROFILE("ESB:GUIScoreboard:CreatePlayerItem")
 	-- Reuse an existing player item if there is one.
 	if table.icount(self.reusePlayerItems) > 0 then
 		local returnPlayerItem = self.reusePlayerItems[1]
@@ -2246,6 +2283,7 @@ function GUIScoreboard:CreatePlayerItem()
 end
 
 local function HandlePlayerVoiceClicked(self)
+	PROFILE("ESB:GUIScoreboard:HandlePlayerVoiceClicked")
 	if MouseTracker_GetIsVisible() then
 		local mouseX, mouseY = Client.GetCursorPosScreen()
 		for t = 1, #self.teams do
@@ -2262,6 +2300,7 @@ local function HandlePlayerVoiceClicked(self)
 end
 
 local function HandlePlayerTextClicked(self)
+	PROFILE("ESB:GUIScoreboard:HandlePlayerTextClicked")
 	if MouseTracker_GetIsVisible() then
 		local mouseX, mouseY = Client.GetCursorPosScreen()
 		for t = 1, #self.teams do
@@ -2301,6 +2340,7 @@ local function HandlePlayerTextClicked(self)
 end
 
 function GUIScoreboard:SetIsVisible(state)
+	PROFILE("ESB:GUIScoreboard:SetIsVisible")
 	self.hiddenOverride = not state
 
 	-- Don't remove the deltatime parameter we use it to detect if the scoreboard get opened
@@ -2312,6 +2352,7 @@ function GUIScoreboard:GetIsVisible()
 end
 
 function GUIScoreboard:SendKeyEvent(key, down)
+	PROFILE("ESB:GUIScoreboard:SendKeyEvent")
 	if ChatUI_EnteringChatMessage() then
 		return false
 	end
@@ -2321,7 +2362,10 @@ function GUIScoreboard:SendKeyEvent(key, down)
 		if not self.visible then
 			self.hoverMenu:Hide()
 		else
-			self.updateInterval = 0
+			self.updateInterval = 0.01
+			if self.background and not self.background:GetIsVisible() then
+				self:Update(0)
+			end
 		end
 	end
 
@@ -2436,6 +2480,7 @@ end
 
 -- ToDo: eal
 local function CreateEALIcon(container, Texture, TextureVector, TextureSize, IconNr, haveNumber, sTooltip)
+	PROFILE("ESB:GUIScoreboard:CreateEALIcon")
 	local containerSize = container:GetSize()
 
 	local item = {}
@@ -2503,6 +2548,7 @@ local function CreateEALIcon(container, Texture, TextureVector, TextureSize, Ico
 end
 
 function GUIScoreboard:CreateEALGraphicHeader(team, color, logoTexture, logoCoords, logoSizeX, logoSizeY)
+	PROFILE("ESB:GUIScoreboard:CreateEALGraphicHeader")
 	local item = {}
 
 	item.background = GUIManager:CreateGraphicItem()
