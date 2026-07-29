@@ -1055,12 +1055,6 @@ function GUIScoreboard:Update_SetMainVisibles()
 
 end
 
---[[
-TODO:
-* Only update x3-5/s
-* Need to update the visible/invisible instantly on key pressing, only the rest needs to be delayed
---]]
---local kScoreboardUpdateInterval = 1/4 -- Only update this amount of time per seconds
 function GUIScoreboard:Update(deltaTime)
 	PROFILE("ESB:Update")
 
@@ -1329,24 +1323,6 @@ function GUIScoreboard:UpdateTeam__playersPlaceAndName(player, playerRecord)
 		player["Name"]:SetText(finalName .. "...")
 	end
 end
-
---[[
-function GUIScoreboard:UpdateTeam__muting(player, playerRecord)
-	local clientIndex = playerRecord.ClientIndex
-
-	-- Needed to determine who to (un)mute when voice icon is clicked.
-	player["ClientIndex"] = clientIndex
-
-	-- Voice icon.
-	local playerVoiceColor = GUIScoreboard.kVoiceDefaultColor
-	local voiceChannel = clientIndex and ChatUI_GetVoiceChannelForClient(clientIndex) or VoiceChannel.Invalid
-	if ChatUI_GetClientMuted(clientIndex) then
-		playerVoiceColor = GUIScoreboard.kVoiceMuteColor
-	elseif voiceChannel ~= VoiceChannel.Invalid then
-		playerVoiceColor = teamColor
-	end
-end
---]]
 
 function GUIScoreboard:UpdateTeam__skillIcons(player, playerRecord)
 
