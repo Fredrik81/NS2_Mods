@@ -213,7 +213,7 @@ local function myPrint(string)
 	end
 end
 
-function GUIScoreboard:Update_FetchPlayerStats(fetchTable)
+local function fetchPlayerStats(fetchTable)
 	PROFILE("ESB:fetchPlayerStats")
 
 	if not fetchTable or #fetchTable == 0 or globalFetchTime + 15 > Shared.GetTime() then
@@ -1066,7 +1066,8 @@ function GUIScoreboard:Update(deltaTime)
 	local contentXSize, contentYSize = self:Update_toNewSizes(teamGUISize)
 
 	self:Update_topBarMode()
-	self:Update_FetchPlayerStats(fetchTable)
+	
+	fetchPlayerStats(fetchTable)
 
 	if vis then
 		self:Update_GUIElements(deltaTime, contentXSize, contentYSize)
