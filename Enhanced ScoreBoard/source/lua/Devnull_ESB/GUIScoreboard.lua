@@ -213,20 +213,16 @@ local function myPrint(string)
 	end
 end
 
-local function fetchPlayerStats(steamId)
-	if not steamId then
-		return
-	end
-
+local function fetchPlayerStats(fetchTable)
 	PROFILE("ESB:fetchPlayerStats")
 
-	if globalFetchTime + 15 > Shared.GetTime() then
+	if not fetchTable or #fetchTable == 0 or globalFetchTime + 15 > Shared.GetTime() then
 		return
 	end
 	globalFetchTime = Shared.GetTime() -- adding this to spam less code
 
 	local usersToFetch = nil
-	for i, user in ipairs(steamId) do
+	for i, user in ipairs(fetchTable) do
 		if not (playerStatsTable[user] and playerStatsTable[user].fetched) then
 			if usersToFetch then
 				usersToFetch = usersToFetch .. "," .. tostring(user)
@@ -337,6 +333,7 @@ local function CreateTeamBackground(self, teamNumber)
 	local teamNameItem = GUIManager:CreateTextItem()
 	teamNameItem:SetFont(GUIScoreboard.kTeamLargeBoldFont)
 	teamNameItem:SetFontIsBold(true)
+
 	GUIMakeFontScale(teamNameItem)
 	teamNameItem:SetAnchor(GUIItem.Left, GUIItem.Top)
 	teamNameItem:SetTextAlignmentX(GUIItem.Align_Min)
@@ -775,99 +772,11 @@ local function GetIsVisibleTeam(teamNumber)
 	return isVisibleTeam
 end
 
-function GUIScoreboard:Update(deltaTime)
-	PROFILE("GUIScoreboard:Update")
-
-	local vis = self.visible and not self.hiddenOverride
-
-	-- Show all the elements the frame after sorting them
-	-- so it doesn't appear to shift when we open
-	local displayScoreboard = self.slidePercentage > -1 and not self.hiddenOverride
-	self.gameTimeBackground:SetIsVisible(displayScoreboard)
-	self.gameTime:SetIsVisible(displayScoreboard)
-	self.background:SetIsVisible(displayScoreboard)
-	self.scoreboardBackground:SetIsVisible(displayScoreboard)
-	if lastScoreboardVisState ~= displayScoreboard then
-		lastScoreboardVisState = displayScoreboard
-		if vis == false then
-			self.updateInterval = 0.3
-			self.badgeNameTooltip:Hide(0)
-		end
-	end
-
-	if not vis then
-		SetMouseVisible(self, false)
-	end
-
-	if self.hoverMenu.background:GetIsVisible() then
-		if not vis then
-			self.hoverMenu:Hide()
-		end
-	else
-		self.hoverPlayerClientIndex = 0
-	end
-
-	if not self.mouseVisible then
-		-- Click for mouse only visible when not a commander and when the scoreboard is visible.
-		local clickForMouseBackgroundVisible = (not PlayerUI_IsACommander()) and vis
-		self.clickForMouseBackground:SetIsVisible(clickForMouseBackgroundVisible)
-		local backgroundColor = PlayerUI_GetTeamColor()
-		backgroundColor.a = 0.8
-		self.clickForMouseBackground:SetColor(backgroundColor)
-	end
-
-	local gInfo = GetGameInfoEntity()
-	local isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
-
-	--First, update teams.
-	local teamGUISize = {}
-	local fetchTable = {}
-	for index, team in ipairs(self.teams) do
-		-- Don't draw if no players on team
-		local scores = team["GetScores"]()
-		for index, player in pairs(scores) do
-			local steamId = GetSteamIdForClientIndex((player and player.ClientIndex) and player.ClientIndex or nil)
-			if steamId and steamId > 0 then
-				table.insert(fetchTable, steamId)
-				if not isPreGame then
-					--Handle last com scenarios
-					local playingTeam = team.TeamNumber ~= kTeamReadyRoom
-					if playingTeam and player.IsCommander then
-						if lastComm[team.TeamNumber] ~= steamId then
-							lastComm[team.TeamNumber] = steamId
-						end
-					end
-				end
-			end
-		end
-		local numPlayers = table.icount(scores)
-		if team.TeamNumber == 0 and numPlayers == 0 and PlayerUI_GetNumConnectingPlayers() > 0 then
-			numPlayers = PlayerUI_GetNumConnectingPlayers()
-		end
-		team["GUIs"]["Background"]:SetIsVisible(vis and (numPlayers > 0))
-
-		if vis then
-			self:UpdateTeam(team)
-			if numPlayers > 0 then
-				if teamGUISize[playerRecord] == nil then
-					teamGUISize[team.TeamNumber] = {}
-				end
-				teamGUISize[team.TeamNumber] = self.teams[index].GUIs.Background:GetSize().y
-			end
-		end
-		if team.TeamNumber == kTeamReadyRoom and numPlayers <= 0 then
-			localPlayerIsSpectator = false
-		elseif team.TeamNumber ~= kTeamReadyRoom and numPlayers <= 0 then
-			lastComm[team.TeamNumber] = nil
-		end
-	end
-
-	--Fetch player data if needed
-	if #fetchTable > 0 then
-		fetchPlayerStats(fetchTable)
-	end
+function GUIScoreboard:Update_topBarMode()
+	PROFILE("ESB:Update_topBarMode")
 
 	local topBar = nil
+	local vis = self.visible and not self.hiddenOverride
 	--Yes, a bit janky but each "mode" needs different handling
 	if PlayerUI_GetIsSpecating() then
 		topBar = GetGUIManager():GetGUIScriptSingle("GUIInsight_TopBar")
@@ -882,124 +791,289 @@ function GUIScoreboard:Update(deltaTime)
 			topBar:SetIsHiddenOverride(vis)
 		end
 	end
+end
 
-	if vis then
-		if self.hoverPlayerClientIndex == 0 and GUIItemContainsPoint(self.scoreboardBackground, Client.GetCursorPosScreen()) then
-			self.badgeNameTooltip:Hide(0)
-		end
+-- Current commander/last-commander info
+function GUIScoreboard:Update_teamsInfo()
+	PROFILE("ESB:Update_teamsInfo")
 
-		local gameTime = PlayerUI_GetGameLengthTime()
-		local minutes = math.floor(gameTime / 60)
-		local seconds = math.floor(gameTime - minutes * 60)
+	local vis = self.visible and not self.hiddenOverride
+	local teamGUISize = {}
+	local fetchTable = {}
 
-		local serverName = Client.GetServerIsHidden() and "Hidden" or Client.GetConnectedServerName()
-		local serverPopulation = gInfo:GetNumClientsTotal()
-		serverPopulation = serverPopulation == 1 and tostring(serverPopulation) .. " player" or tostring(serverPopulation) .. " players"
-		local gameTimeText = serverName .. " | " .. serverPopulation .. " | " .. Shared.GetMapName() .. string.format(" - %d:%02d", minutes, seconds)
+	local gInfo = GetGameInfoEntity()
+	local isPreGame = gInfo and gInfo:GetState() <= kGameState.PreGame
 
-		self.gameTime:SetText(gameTimeText)
+	for index, team in ipairs(self.teams) do
 
-		-- Update the favorite button when the coreboard opens (dt == 0)
-		if deltaTime == 0 then
-			self.favoriteButton.isServerFavorite = GetServerIsFavorite(self.serverAddress)
-			self.favoriteButton:SetTexture(self.favoriteButton.isServerFavorite and self.kFavoriteTexture or self.kNotFavoriteTexture)
-
-			self.blockedButton.isServerBlocked = GetServerIsFavorite(self.serverAddress)
-			self.blockedButton:SetTexture(self.blockedButton.isServerBlocked and self.kBlockedTexture or self.kNotBlockedTexture)
-		end
-
-		local width = self.gameTime:GetTextWidth(gameTimeText) / 2 + (self.kBlockedIconSize.x + GUIScale(30))
-		self.blockedButton:SetPosition(Vector(-width, GUIScale(4), 0))
-
-		width = width + (self.kFavoriteIconSize.x + GUIScale(10))
-		self.favoriteButton:SetPosition(Vector(-width, GUIScale(4), 0))
-
-		-- Get sizes for everything so we can reposition correctly
-		local contentYSize = 0
-		local teamItemWidth = self:GetTeamItemWidth() * GUIScoreboard.kScalingFactor
-		local teamItemVerticalFormat = teamItemWidth * 2 > GUIScoreboard.screenWidth
-		local contentXOffset = (GUIScoreboard.screenWidth - teamItemWidth * 2) / 2
-		local contentXExtraOffset = ConditionalValue(GUIScoreboard.screenWidth > 1900, contentXOffset * 0.33, 15 * GUIScoreboard.kScalingFactor)
-		local contentXSize = teamItemWidth + contentXExtraOffset * 2
-		local contentYSpacing = 20 * GUIScoreboard.kScalingFactor
-
-		if teamGUISize[1] then
-			-- If it doesn't fit horizontally or there is only one team put it below
-			if teamItemVerticalFormat or not teamGUISize[2] then
-				self.teams[2].GUIs.Background:SetPosition(Vector(-teamItemWidth / 2, contentYSize + kTitleSize.y + 5, 0))
-				contentYSize = contentYSize + teamGUISize[1] + contentYSpacing + kTitleSize.y + 5
-			else
-				self.teams[2].GUIs.Background:SetPosition(Vector(-teamItemWidth - contentXOffset / 2 + contentXExtraOffset, contentYSize + kTitleSize.y, 0))
-			end
-		end
-		if teamGUISize[2] then
-			-- If it doesn't fit horizontally or there is only one team put it below
-			if teamItemVerticalFormat or not teamGUISize[1] then
-				self.teams[3].GUIs.Background:SetPosition(Vector(-teamItemWidth / 2, contentYSize + kTitleSize.y + 5, 0))
-				contentYSize = contentYSize + teamGUISize[2] + contentYSpacing + kTitleSize.y + 5
-			else
-				self.teams[3].GUIs.Background:SetPosition(Vector(contentXOffset / 2 - contentXExtraOffset, contentYSize + kTitleSize.y, 0))
-			end
-		end
-		-- If both teams fit horizontally then take only the biggest size
-		if teamGUISize[1] and teamGUISize[2] and not teamItemVerticalFormat then
-			contentYSize = math.max(teamGUISize[1], teamGUISize[2]) + contentYSpacing * 2 + kTitleSize.y + 5
-			contentXSize = teamItemWidth * 2 + contentXOffset
-		end
-		if teamGUISize[0] then
-			self.teams[1].GUIs.Background:SetPosition(Vector(-teamItemWidth / 2, contentYSize, 0))
-			contentYSize = contentYSize + teamGUISize[0] + contentYSpacing
-		end
-
-		local slideOffset = -(self.slidePercentage * contentYSize / 100) + (self.slidePercentage * self.slidebarBg:GetSize().y / 100)
-		local displaySpace = Client.GetScreenHeight() - ((GUIScoreboard.kClickForMouseBackgroundSize.y + 5) + (GUIScoreboard.kGameTimeBackgroundSize.y + 6) + 20)
-		local showSlidebar = contentYSize > displaySpace
-		local ySize = math.min(displaySpace, contentYSize)
-
-		if self.slidePercentage == -1 then
-			self.slidePercentage = 0
-			local teamNumber = Client.GetLocalPlayer():GetTeamNumber()
-			if showSlidebar and teamNumber ~= 3 and self.centerOnPlayer then
-				local player = self.playerHighlightItem:GetParent()
-				local playerItem = player:GetPosition().y
-				local teamItem = player:GetParent() and player:GetParent():GetPosition().y or 0
-				local playerPos = playerItem + teamItem + GUIScoreboard.kPlayerItemHeight
-				if playerPos > displaySpace then
-					self.slidePercentage = math.max(0, math.min((playerPos / contentYSize * 100), 100))
+		-- Update coms info
+		local scores = team["GetScores"]()
+		for _, player in pairs(scores) do
+			local steamId = GetSteamIdForClientIndex((player and player.ClientIndex) and player.ClientIndex or nil)
+			if steamId and steamId > 0 then
+				table.insert(fetchTable, steamId)
+				if not isPreGame then
+					--Handle last com scenarios
+					local playingTeam = team.TeamNumber ~= kTeamReadyRoom
+					if playingTeam and player.IsCommander then
+						if lastComm[team.TeamNumber] ~= steamId then
+							lastComm[team.TeamNumber] = steamId
+						end
+					end
 				end
 			end
 		end
 
-		local sliderPos = (self.slidePercentage * self.slidebarBg:GetSize().y / 100)
-		if sliderPos < self.slidebar:GetSize().y / 2 then
-			sliderPos = 0
-		end
-		if sliderPos > self.slidebarBg:GetSize().y - self.slidebar:GetSize().y then
-			sliderPos = self.slidebarBg:GetSize().y - self.slidebar:GetSize().y
+		-- Update connecting players info
+		local numPlayers = table.icount(scores)
+		if team.TeamNumber == 0 and numPlayers == 0 and PlayerUI_GetNumConnectingPlayers() > 0 then
+			numPlayers = PlayerUI_GetNumConnectingPlayers()
 		end
 
-		self.background:SetPosition(Vector(0, 10 + (-ySize / 2 + slideOffset), 0))
-		self.scoreboardBackground:SetSize(Vector(contentXSize, ySize, 0))
-		self.scoreboardBackground:SetPosition(Vector(-contentXSize / 2, -ySize / 2, 0))
-		self.backgroundStencil:SetSize(Vector(contentXSize, ySize - 20, 0))
-		self.backgroundStencil:SetPosition(Vector(0, 10, 0))
-		local gameTimeBgYSize = self.gameTimeBackground:GetSize().y
-		local gameTimeBgYPos = self.gameTimeBackground:GetPosition().y
-
-		self.gameTimeBackground:SetSize(Vector(contentXSize, gameTimeBgYSize, 0))
-		self.gameTimeBackground:SetPosition(Vector(-contentXSize / 2, gameTimeBgYPos, 0))
-
-		self.slidebar:SetPosition(Vector(0, sliderPos, 0))
-		self.slidebarBg:SetIsVisible(showSlidebar)
-		self.scoreboardBackground:SetColor(ConditionalValue(showSlidebar, GUIScoreboard.kBgColor, Color(0, 0, 0, 0)))
-
-		local mouseX, mouseY = Client.GetCursorPosScreen()
-		if self.mousePressed["LMB"]["Down"] and self.isDragging then
-			HandleSlidebarClicked(self, mouseX, mouseY)
+		if vis then -- The heavy parts, updates each player line
+			self:UpdateTeam(team)
+			if numPlayers > 0 then
+				if teamGUISize[playerRecord] == nil then
+					teamGUISize[team.TeamNumber] = {}
+				end
+				teamGUISize[team.TeamNumber] = self.teams[index].GUIs.Background:GetSize().y
+			end
 		end
-	else
+
+		-- Update self
+		if team.TeamNumber == kTeamReadyRoom and numPlayers <= 0 then
+			localPlayerIsSpectator = false
+		elseif team.TeamNumber ~= kTeamReadyRoom and numPlayers <= 0 then
+			lastComm[team.TeamNumber] = nil
+		end
+	end
+
+	return fetchTable, teamGUISize
+end
+
+function GUIScoreboard:Update_GUIElements(deltaTime, contentXSize, contentYSize)
+	PROFILE("ESB:Update_GUIElements")
+
+	local displaySpace = Client.GetScreenHeight() - ((GUIScoreboard.kClickForMouseBackgroundSize.y + 5) + (GUIScoreboard.kGameTimeBackgroundSize.y + 6) + 20)
+
+	-- Update game time and server name
+	local mapName = Shared.GetMapName()
+	local serverName = Client.GetServerIsHidden() and "Hidden" or Client.GetConnectedServerName()
+
+	local gameTime = PlayerUI_GetGameLengthTime()
+	local minutes = math.floor(gameTime / 60)
+	local seconds = math.floor(gameTime - minutes * 60)
+	
+	local gInfo = GetGameInfoEntity()
+	local serverPop = gInfo:GetNumClientsTotal()
+	local serverPopText = serverPopulation == 1 and tostring(serverPop) .. " player" or tostring(serverPop) .. " players"
+	local gameTimeText = serverName .. " | " .. serverPopText .. " | " .. mapName .. string.format(" - %d:%02d", minutes, seconds)
+	
+	self.gameTime:SetText(gameTimeText)
+
+	-- Favorite/Blocked buttons
+	local width = self.gameTime:GetTextWidth(gameTimeText) / 2 + (self.kBlockedIconSize.x + GUIScale(30))
+	local widthBlockedButton = width
+	local widthFavoriteButton = width + (self.kFavoriteIconSize.x + GUIScale(10))
+
+	-- Update the favorite button when the scoreboard opens (dt == 0)
+	if deltaTime == 0 then
+		self.favoriteButton.isServerFavorite = GetServerIsFavorite(self.serverAddress)
+		self.favoriteButton:SetTexture(self.favoriteButton.isServerFavorite and self.kFavoriteTexture or self.kNotFavoriteTexture)
+
+		self.blockedButton.isServerBlocked = GetServerIsFavorite(self.serverAddress)
+		self.blockedButton:SetTexture(self.blockedButton.isServerBlocked and self.kBlockedTexture or self.kNotBlockedTexture)
+	end
+
+	self.blockedButton:SetPosition(Vector(-width, GUIScale(4), 0))
+	self.favoriteButton:SetPosition(Vector(-widthFavoriteButton, GUIScale(4), 0))
+
+	-- Fetch slide bars and display space
+	local sliderPos = (self.slidePercentage * self.slidebarBg:GetSize().y / 100)
+	if sliderPos < self.slidebar:GetSize().y / 2 then
+		sliderPos = 0
+	end
+	if sliderPos > self.slidebarBg:GetSize().y - self.slidebar:GetSize().y then
+		sliderPos = self.slidebarBg:GetSize().y - self.slidebar:GetSize().y
+	end
+
+	local showSlidebar = contentYSize > displaySpace
+	self.slidebar:SetPosition(Vector(0, sliderPos, 0))
+	self.slidebarBg:SetIsVisible(showSlidebar)
+
+	if self.slidePercentage == -1 then
+		self.slidePercentage = 0
+		local teamNumber = Client.GetLocalPlayer():GetTeamNumber()
+		if showSlidebar and teamNumber ~= 3 and self.centerOnPlayer then
+			local player = self.playerHighlightItem:GetParent()
+			local playerItem = player:GetPosition().y
+			local teamItem = player:GetParent() and player:GetParent():GetPosition().y or 0
+			local playerPos = playerItem + teamItem + GUIScoreboard.kPlayerItemHeight
+			if playerPos > displaySpace then
+				self.slidePercentage = math.max(0, math.min((playerPos / contentYSize * 100), 100))
+			end
+		end
+	end
+
+	-- Sets game time and background stuff
+	local gameTimeBgYSize = self.gameTimeBackground:GetSize().y
+	local gameTimeBgYPos = self.gameTimeBackground:GetPosition().y
+	self.gameTimeBackground:SetSize(Vector(contentXSize, gameTimeBgYSize, 0))
+	self.gameTimeBackground:SetPosition(Vector(-contentXSize / 2, gameTimeBgYPos, 0))
+
+	local ySize = math.min(displaySpace, contentYSize)
+	local slideOffset = -(self.slidePercentage * contentYSize / 100) + (self.slidePercentage * self.slidebarBg:GetSize().y / 100)
+	self.background:SetPosition(Vector(0, 10 + (-ySize / 2 + slideOffset), 0))
+	self.backgroundStencil:SetSize(Vector(contentXSize, ySize - 20, 0))
+	self.backgroundStencil:SetPosition(Vector(0, 10, 0))
+
+	self.scoreboardBackground:SetSize(Vector(contentXSize, ySize, 0))
+	self.scoreboardBackground:SetPosition(Vector(-contentXSize / 2, -ySize / 2, 0))
+
+	self.scoreboardBackground:SetColor(ConditionalValue(showSlidebar, GUIScoreboard.kBgColor, Color(0, 0, 0, 0)))
+
+	--- Mouse
+	local mouseX, mouseY = Client.GetCursorPosScreen()
+	if self.mousePressed["LMB"]["Down"] and self.isDragging then
+		HandleSlidebarClicked(self, mouseX, mouseY)
+	end
+
+	if not self.mouseVisible then
+		-- Click for mouse only visible when not a commander and when the scoreboard is visible.
+		local backgroundColor = PlayerUI_GetTeamColor()
+		backgroundColor.a = 0.8
+		self.clickForMouseBackground:SetColor(backgroundColor)
+	end
+end
+
+function GUIScoreboard:Update_toNewSizes(teamGUISize)
+	PROFILE("ESB:Update_toNewSizes")
+
+	-- Get sizes for everything so we can reposition correctly
+	local contentYSize = 0
+	local teamItemWidth = self:GetTeamItemWidth() * GUIScoreboard.kScalingFactor
+	local teamItemVerticalFormat = teamItemWidth * 2 > GUIScoreboard.screenWidth
+	local contentXOffset = (GUIScoreboard.screenWidth - teamItemWidth * 2) / 2
+	local contentXExtraOffset = ConditionalValue(GUIScoreboard.screenWidth > 1900, contentXOffset * 0.33, 15 * GUIScoreboard.kScalingFactor)
+	local contentXSize = teamItemWidth + contentXExtraOffset * 2
+	local contentYSpacing = 20 * GUIScoreboard.kScalingFactor
+
+	if teamGUISize[1] then
+		-- If it doesn't fit horizontally or there is only one team put it below
+		if teamItemVerticalFormat or not teamGUISize[2] then
+			self.teams[2].GUIs.Background:SetPosition(Vector(-teamItemWidth / 2, contentYSize + kTitleSize.y + 5, 0))
+			contentYSize = contentYSize + teamGUISize[1] + contentYSpacing + kTitleSize.y + 5
+		else
+			self.teams[2].GUIs.Background:SetPosition(Vector(-teamItemWidth - contentXOffset / 2 + contentXExtraOffset, contentYSize + kTitleSize.y, 0))
+		end
+	end
+	if teamGUISize[2] then
+		-- If it doesn't fit horizontally or there is only one team put it below
+		if teamItemVerticalFormat or not teamGUISize[1] then
+			self.teams[3].GUIs.Background:SetPosition(Vector(-teamItemWidth / 2, contentYSize + kTitleSize.y + 5, 0))
+			contentYSize = contentYSize + teamGUISize[2] + contentYSpacing + kTitleSize.y + 5
+		else
+			self.teams[3].GUIs.Background:SetPosition(Vector(contentXOffset / 2 - contentXExtraOffset, contentYSize + kTitleSize.y, 0))
+		end
+	end
+
+	-- If both teams fit horizontally then take only the biggest size
+	if teamGUISize[1] and teamGUISize[2] and not teamItemVerticalFormat then
+		contentYSize = math.max(teamGUISize[1], teamGUISize[2]) + contentYSpacing * 2 + kTitleSize.y + 5
+		contentXSize = teamItemWidth * 2 + contentXOffset
+	end
+	if teamGUISize[0] then
+		self.teams[1].GUIs.Background:SetPosition(Vector(-teamItemWidth / 2, contentYSize, 0))
+		contentYSize = contentYSize + teamGUISize[0] + contentYSpacing
+	end
+
+	
+	local displaySpace = Client.GetScreenHeight() - ((GUIScoreboard.kClickForMouseBackgroundSize.y + 5) + (GUIScoreboard.kGameTimeBackgroundSize.y + 6) + 20)
+	local showSlidebar = contentYSize > displaySpace
+
+	return contentXSize, contentYSize
+end
+
+function GUIScoreboard:Update_SetMainVisibles()
+	PROFILE("ESB:Update_SetMainVisibles")
+
+	-- Show all the elements the frame after sorting them
+	-- so it doesn't appear to shift when we open
+	local vis = self.visible and not self.hiddenOverride
+	local displayScoreboard = vis and self.slidePercentage > -1 and not self.hiddenOverride
+	local isACommander = PlayerUI_IsACommander()
+
+	self.clickForMouseBackground:SetIsVisible(vis and not self.mouseVisible and not isACommander)
+	self.gameTimeBackground:SetIsVisible(displayScoreboard)
+	self.gameTime:SetIsVisible(displayScoreboard)
+	self.background:SetIsVisible(displayScoreboard)
+	self.scoreboardBackground:SetIsVisible(displayScoreboard)
+
+	---
+
+	if lastScoreboardVisState ~= displayScoreboard then
+		lastScoreboardVisState = displayScoreboard
+		if vis == false then
+			self.updateInterval = 0.2
+			self.badgeNameTooltip:Hide(0)
+		end
+	end
+
+	
+	if self.hoverPlayerClientIndex == 0 then
+		local containsPoint = GUIItemContainsPoint(self.scoreboardBackground, Client.GetCursorPosScreen())
+		if containsPoint then
+			self.badgeNameTooltip:Hide(0)
+		end
+	end
+
+	---
+
+	if not vis then
+		SetMouseVisible(self, false)
 		self.slidePercentage = -1
 	end
+
+	---
+
+	if self.hoverMenu.background:GetIsVisible() then
+		if not vis then
+			self.hoverMenu:Hide()
+		end
+	else
+		self.hoverPlayerClientIndex = 0
+	end
+
+	---
+
+	for index, team in ipairs(self.teams) do
+		local numPlayers = table.icount(team["GetScores"]())
+		team["GUIs"]["Background"]:SetIsVisible(vis and (numPlayers > 0))
+	end
+
+	--
+
+end
+
+function GUIScoreboard:Update(deltaTime)
+	PROFILE("ESB:Update")
+
+	local vis = self.visible and not self.hiddenOverride
+	local gInfo = GetGameInfoEntity()
+	local isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
+
+	local fetchTable, teamGUISize = self:Update_teamsInfo()
+	local contentXSize, contentYSize = self:Update_toNewSizes(teamGUISize)
+
+	self:Update_topBarMode()
+	
+	fetchPlayerStats(fetchTable)
+
+	if vis then
+		self:Update_GUIElements(deltaTime, contentXSize, contentYSize)
+	end
+
+	self:Update_SetMainVisibles()
 end
 
 local function SetPlayerItemBadges(item, badgeTextures)
@@ -1026,7 +1100,7 @@ local function SetPlayerItemBadges(item, badgeTextures)
 end
 
 local function GetCountByStatus(team, status, partof)
-	PROFILE("ESB:GetCountByStatus")
+	PROFILE("ESB:GUIScoreboard:UpdateTeam")
 	local count = 0
 	for index, item in ipairs(team) do
 		if partof and string.find(item["Status"], status) then
@@ -1038,8 +1112,503 @@ local function GetCountByStatus(team, status, partof)
 	return count
 end
 
+function GUIScoreboard:UpdateTeam__commanderName(player, playerRecord, teamInfoGUIItem)
+
+	PROFILE("GUIScoreboard:UpdateTeam__commanderName")
+
+	local clientIndex = playerRecord.ClientIndex
+	local steamId = GetSteamIdForClientIndex(clientIndex)
+	local teamNumber = playerRecord.EntityTeamNumber
+	local isVisibleTeam = GetIsVisibleTeam(teamNumber)
+	local isPlayingTeam = teamNumber ~= kTeamReadyRoom
+	local isLastComm = lastComm[teamNumber] == steamId
+	local isCommander = playerRecord.IsCommander and isVisibleTeam == true
+	local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
+	local playerStatus = isVisibleTeam and playerRecord.Status or "-"
+	local playerName = playerRecord.Name
+	local isBot = steamId == 0
+	local isRookie = playerRecord.IsRookie
+	local playerCommSkillTier, _ = GetPlayerSkillTier(playerRecord.playerCommSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
+
+	-- Update commander text based on lastComm
+	if isLastComm or isCommander then
+		commRage = false --Check for Commander Rage quit
+		teamInfoGUIItem["teamComm"]:SetText(playerName)
+	end
+
+	if isVisibleTeam and teamNumber == kTeam1Index then
+		if table.icontains(currentTech, kTechId.Jetpack) then
+			if playerStatus ~= "" and playerStatus ~= " " then
+				playerStatus = string.format("%s/%s", playerStatus, Locale.ResolveString("STATUS_JETPACK"))
+			else
+				playerStatus = Locale.ResolveString("STATUS_JETPACK")
+			end
+		end
+		if table.icontains(currentTech, kTechId.DualMinigunExosuit) then
+			if playerStatus ~= "" and playerStatus ~= " " then
+				playerStatus = string.format("%s-%s", playerStatus, "Mini")
+			else
+				playerStatus = Locale.ResolveString("HELP_SCREEN_EXO_MINIGUN")
+			end
+		elseif table.icontains(currentTech, kTechId.DualRailgunExosuit) then
+			if playerStatus ~= "" and playerStatus ~= " " then
+				playerStatus = string.format("%s-%s", playerStatus, "Rail")
+			else
+				playerStatus = Locale.ResolveString("HELP_SCREEN_EXO_RAILGUN")
+			end
+		end
+	end
+
+	if (isCommander or (isLastComm and not isBot)) and isPlayingTeam then
+		if playerCommSkillTier > 0 then
+			player.CommIcon:SetTexturePixelCoordinates(0, (playerCommSkillTier + 1) * 32, 32, (playerCommSkillTier + 2) * 32)
+		else
+			player.CommIcon:SetTexturePixelCoordinates(0, 0, 32, 32)
+		end
+		player.CommIcon:SetIsVisible(true)
+	else
+		player.CommIcon:SetIsVisible(false)
+	end
+
+	player["Status"]:SetText(playerStatus)
+end
+
+function GUIScoreboard:UpdateTeam__upgradesIcons(player, playerRecord)
+
+	PROFILE("GUIScoreboard:UpdateTeam__upgradesIcons")
+
+	local teamNumber = playerRecord.EntityTeamNumber
+	local isVisibleTeam = GetIsVisibleTeam(teamNumber)
+	local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
+
+	-- Upgrade Icons handle
+	-- -- Marines
+	local showTech = isVisibleTeam and teamNumber == kTeam1Index
+	if showTech and table.icontains(currentTech, kTechId.Welder) then
+		player.UpgradeIcons["marineWelder"]:SetIsVisible(true)
+	else
+		player.UpgradeIcons["marineWelder"]:SetIsVisible(false)
+	end
+	if showTech and (table.icontains(currentTech, kTechId.GasGrenade) or table.icontains(currentTech, kTechId.ClusterGrenade) or table.icontains(currentTech, kTechId.PulseGrenade)) then
+		player.UpgradeIcons["marineGrenade"]:SetIsVisible(true)
+	else
+		player.UpgradeIcons["marineGrenade"]:SetIsVisible(false)
+	end
+	if showTech and table.icontains(currentTech, kTechId.Mine) then
+		player.UpgradeIcons["marineMine"]:SetIsVisible(true)
+	else
+		player.UpgradeIcons["marineMine"]:SetIsVisible(false)
+	end
+
+	-- -- Aliens
+	local showTech = isVisibleTeam and teamNumber == kTeam2Index
+	if showTech and (table.icontains(currentTech, kTechId.Regeneration) or table.icontains(currentTech, kTechId.Carapace) or table.icontains(currentTech, kTechId.Vampirism)) then
+		player.UpgradeIcons["alienShell"]:SetIsVisible(true)
+		if table.icontains(currentTech, kTechId.Regeneration) then
+			if techCarapaceWorkaround then
+				player.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
+			end
+			player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 12, 113 * 1, 114 * 13}))
+		elseif table.icontains(currentTech, kTechId.Carapace) then
+			if techCarapaceWorkaround then
+				player.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
+				player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
+			else
+				player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 12, 113 * 2, 114 * 13}))
+			end
+		elseif table.icontains(currentTech, kTechId.Vampirism) then
+			if techCarapaceWorkaround then
+				player.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
+			end
+			player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 12, 113 * 3, 114 * 13}))
+		end
+	elseif techCarapaceWorkaround and showTech and table.icontains(currentTech, kTechId.Resilience) then
+		player.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
+		player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
+		player.UpgradeIcons["alienShell"]:SetIsVisible(true)
+	else
+		player.UpgradeIcons["alienShell"]:SetIsVisible(false)
+	end
+
+	if showTech and (table.icontains(currentTech, kTechId.Camouflage) or table.icontains(currentTech, kTechId.Focus) or table.icontains(currentTech, kTechId.Aura)) then
+		player.UpgradeIcons["alienVeil"]:SetIsVisible(true)
+		if table.icontains(currentTech, kTechId.Camouflage) then
+			player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 13, 113 * 1, 114 * 14}))
+		elseif table.icontains(currentTech, kTechId.Focus) then
+			player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 13, 113 * 2, 114 * 14}))
+		elseif table.icontains(currentTech, kTechId.Aura) then
+			player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 13, 113 * 3, 114 * 14}))
+		end
+	else
+		player.UpgradeIcons["alienVeil"]:SetIsVisible(false)
+	end
+	if showTech and (table.icontains(currentTech, kTechId.Adrenaline) or table.icontains(currentTech, kTechId.Celerity) or table.icontains(currentTech, kTechId.Crush)) then
+		player.UpgradeIcons["alienSpur"]:SetIsVisible(true)
+		if table.icontains(currentTech, kTechId.Adrenaline) then
+			player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 14, 113 * 1, 114 * 15}))
+		elseif table.icontains(currentTech, kTechId.Celerity) then
+			player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 14, 113 * 2, 114 * 15}))
+		elseif table.icontains(currentTech, kTechId.Crush) then
+			player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 14, 113 * 3, 114 * 15}))
+		end
+	else
+		player.UpgradeIcons["alienSpur"]:SetIsVisible(false)
+	end
+end
+
+function GUIScoreboard:UpdateTeam__highlightCurrentPlayer(player, playerRecord)
+	PROFILE("GUIScoreboard:UpdateTeam__highlightCurrentPlayer")
+
+	-- Handle local player highlight
+	if ScoreboardUI_IsPlayerLocal(playerName) then
+		if self.playerHighlightItem:GetParent() ~= player["Background"] then
+			if self.playerHighlightItem:GetParent() ~= nil then
+				self.playerHighlightItem:GetParent():RemoveChild(self.playerHighlightItem)
+			end
+			player["Background"]:AddChild(self.playerHighlightItem)
+			self.playerHighlightItem:SetIsVisible(true)
+			self.playerHighlightItem:SetColor(localPlayerHighlightColor)
+		end
+	end
+end
+
+function GUIScoreboard:UpdateTeam__playersPlaceAndName(player, playerRecord)
+
+	PROFILE("GUIScoreboard:UpdateTeam__playersPlaceAndName")
+
+	local teamNumber = playerRecord.EntityTeamNumber
+	local clientIndex = playerRecord.ClientIndex
+
+	-- New scoreboard positioning
+	local numberSize = 0
+	if player["Number"]:GetIsVisible() then
+		numberSize = kPlayerNumberWidth
+	end
+
+	for i = 1, #player["BadgeItems"] do
+		player["BadgeItems"][i]:SetPosition(Vector(numberSize + kPlayerItemLeftMargin + (i - 1) * kPlayerVoiceChatIconSize + (i - 1) * kPlayerBadgeRightPadding, -kPlayerVoiceChatIconSize / 2, 0) * GUIScoreboard.kScalingFactor)
+	end
+
+	local statusPos = ConditionalValue(GUIScoreboard.screenWidth < 1280, GUIScoreboard.kPlayerItemWidth + 30, (self:GetTeamItemWidth() - GUIScoreboard.kTeamColumnSpacingX * 10) + 60)
+	local playerStatus = player["Status"]:GetText()
+	if playerStatus == "-" or (playerStatus ~= Locale.ResolveString("STATUS_SPECTATOR") and teamNumber ~= 1 and teamNumber ~= 2) then
+		player["Status"]:SetText("")
+		statusPos = statusPos + GUIScoreboard.kTeamColumnSpacingX * ConditionalValue(GUIScoreboard.screenWidth < 1280, 2.75, 1.75)
+	end
+
+	SetPlayerItemBadges(player, Badges_GetBadgeTextures(clientIndex, "scoreboard"))
+
+	local numBadges = math.min(#Badges_GetBadgeTextures(clientIndex, "scoreboard"), #player["BadgeItems"])
+	local pos = (numberSize + kPlayerItemLeftMargin + numBadges * kPlayerVoiceChatIconSize + numBadges * kPlayerBadgeRightPadding) * GUIScoreboard.kScalingFactor
+
+	player["Name"]:SetPosition(Vector(pos, 0, 0))
+
+	local nameRightPos = pos + (kPlayerBadgeRightPadding * GUIScoreboard.kScalingFactor)
+
+	pos = player.SkillIcon:GetPosition().x
+	for _, icon in ipairs(player["IconTable"]) do
+		if icon:GetIsVisible() then
+			local iconSize = icon:GetSize()
+			pos = pos - iconSize.x
+			icon:SetPosition(Vector(pos, (-iconSize.y / 2), 0))
+		end
+	end
+
+	local finalName = player["Name"]:GetText()
+	local finalNameWidth = player["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor
+	local dotsWidth = player["Name"]:GetTextWidth("...") * GUIScoreboard.kScalingFactor
+	-- The minimum truncated length for the name also includes the "..."
+	while nameRightPos + finalNameWidth > pos and string.UTF8Length(finalName) > kMinTruncatedNameLength do
+		finalName = string.UTF8Sub(finalName, 1, string.UTF8Length(finalName) - 1)
+		finalNameWidth = (player["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor) + dotsWidth
+		player["Name"]:SetText(finalName .. "...")
+	end
+end
+
+function GUIScoreboard:UpdateTeam__skillIcons(player, playerRecord)
+
+	PROFILE("GUIScoreboard:UpdateTeam__skillIcons")
+
+	local clientIndex = playerRecord.ClientIndex
+	local steamId = GetSteamIdForClientIndex(clientIndex)
+	local playerSkill = playerRecord.Skill or 0
+	local adagradSum = playerRecord.AdagradSum
+	local playerTooltipData = (steamId and steamId > 0 and not isBot) and getPlayerStats(steamId) or nil
+	local isSpectator, isMarine, isAlien = teamNumber == 0, teamNumber == 1, teamNumber == 2
+	local isBot = steamId == 0
+	local isRookie = playerRecord.IsRookie
+	local playerCommSkillTier, playerCommSkillTierName = GetPlayerSkillTier(playerRecord.commSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
+
+	local gInfo = GetGameInfoEntity()
+	local isPreGame = gInfo and gInfo:GetState() <= kGameState.PreGame
+
+	-- Set player skill icon
+	local skillIconOverrideSettings = CheckForSpecialBadgeRecipient(steamId)
+	if skillIconOverrideSettings then
+		-- User has a special skill-tier icon tied to their steam Id.
+
+		-- Reset the skill icon's texture coordinates to the default normalized coordinates (0, 0), (1, 1).
+		-- The shader depends on them being this way.
+		player.SkillIcon:SetTextureCoordinates(0, 0, 1, 1)
+
+		-- Change the skill icon's shader to the one that will animate.
+		player.SkillIcon:SetShader(skillIconOverrideSettings.shader)
+		player.SkillIcon:SetTexture(skillIconOverrideSettings.tex)
+		player.SkillIcon:SetFloatParameter("frameCount", skillIconOverrideSettings.frameCount)
+
+		-- Change the size so it doesn't touch the weapon name text.
+		player.SkillIcon:SetSize(kPlayerSkillIconSizeOverride * GUIScoreboard.kScalingFactor)
+
+		-- Change the tooltip of the skill icon.
+		player.SkillIcon.tooltipText = skillIconOverrideSettings.tooltip
+	else
+		-- User has no special skill-tier icon.
+
+		-- Reset the shader and texture back to the default one.
+		player.SkillIcon:SetShader("shaders/GUIBasic.surface_shader")
+		player.SkillIcon:SetTexture(kPlayerSkillIconTexture)
+		player.SkillIcon:SetSize(kPlayerSkillIconSize * GUIScoreboard.kScalingFactor)
+
+		local skillTier, tierName, cappedSkill = GetPlayerSkillTier(playerSkill, isRookie, adagradSum, isBot)
+		player.SkillIcon.tooltipText = string.format(Locale.ResolveString("SKILLTIER_TOOLTIP"), Locale.ResolveString(tierName), skillTier)
+
+		local iconIndex = skillTier + 2
+		player.SkillIcon:SetTexturePixelCoordinates(0, iconIndex * 32, 100, (iconIndex + 1) * 32 - 1)
+
+		--[[if cappedSkill then
+			sumPlayerSkill = sumPlayerSkill + cappedSkill
+			numPlayerSkill = numPlayerSkill + 1
+		end--]]
+	end
+
+	if isBot then
+		player.SkillIcon.tooltipText = "NS2 Bot"
+	elseif not playerTooltipData then
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nRequesting NS2Panel data..."
+	elseif playerTooltipData and playerTooltipData.fetched and playerTooltipData.fetched == 0 then
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nNo NS2Panel data!"
+	elseif not isBot and playerTooltipData and playerTooltipData.marine_skill then
+		--local midPlayerSkill = ((playerRecord.marineSkill or 0) + (playerRecord.alienSkill or 0)) / 2
+
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
+		if isSpectator or isMarine or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
+		end
+		if isSpectator or isAlien or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
+		end
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+		if isSpectator or isLastComm or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
+		end
+		if isSpectator or isLastComm or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
+		end
+		if isSpectator or (isLastComm and isMarine) or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
+		end
+		if isSpectator or (isLastComm and isAlien) or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
+		end
+		if isSpectator or isLastComm or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+		end
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nKDR:"
+		if isSpectator or isMarine or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " M " .. tostring(playerTooltipData.marine_kdr or 0)
+		end
+		if isSpectator or isAlien or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " A " .. tostring(playerTooltipData.alien_kdr or 0)
+		end
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAccuracy:"
+		if isSpectator or isMarine or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " M " .. tostring(round(playerTooltipData.marine_accuracy or 0, 0))
+		end
+		if isSpectator or isAlien or isPreGame then
+			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " A " .. tostring(round(playerTooltipData.alien_accuracy or 0, 0))
+		end
+		player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nProvided by NS2Panel"
+		playerTooltipData.toolTip = player.SkillIcon.tooltipText
+	end
+end
+
+function GUIScoreboard:UpdateTeam__statsValues(player, playerRecord)
+
+	PROFILE("GUIScoreboard:UpdateTeam__statsValues")
+
+	local clientIndex = playerRecord.ClientIndex
+	local steamId = GetSteamIdForClientIndex(clientIndex)
+	local teamNumber = playerRecord.EntityTeamNumber
+	local isPlayingTeam = teamNumber ~= kTeamReadyRoom
+	local isLastComm = lastComm[teamNumber] == steamId
+	local isBot = steamId == 0
+	local isVisibleTeam = GetIsVisibleTeam(teamNumber)
+	local isCommander = playerRecord.IsCommander and isVisibleTeam == true
+
+	local score = playerRecord.Score
+	local kills = playerRecord.Kills
+	local assists = playerRecord.Assists
+	local deaths = playerRecord.Deaths
+	local resourcesStr = ConditionalValue(isVisibleTeam, tostring(math.floor(playerRecord.Resources * 10) / 10), "-")
+
+	local ping = playerRecord.Ping
+	local pingStr = tostring(ping)
+
+	local deadString = Locale.ResolveString("STATUS_DEAD")
+	local isDead = isVisibleTeam and playerRecord.Status == deadString
+
+	if (isCommander or (isLastComm and not isBot)) and isPlayingTeam then
+		score = "*"
+	end
+
+	if isPlayingTeam then
+		player["Score"]:SetText(tostring(score))
+		player["Kills"]:SetText(tostring(kills))
+		player["Assists"]:SetText(tostring(assists))
+		player["Deaths"]:SetText(tostring(deaths))
+		player["Resources"]:SetText(resourcesStr)
+	end
+	--player["Status"]:SetText(playerStatus)
+	player["Ping"]:SetText(pingStr)
+
+	player["Score"]:SetIsVisible(isPlayingTeam)
+	player["Kills"]:SetIsVisible(isPlayingTeam)
+	player["Assists"]:SetIsVisible(isPlayingTeam)
+	player["Deaths"]:SetIsVisible(isPlayingTeam)
+	player["Resources"]:SetIsVisible(isPlayingTeam)
+
+	local white = GUIScoreboard.kWhiteColor
+	local baseColor, nameColor, statusColor = white, white, white
+
+	if isDead and isVisibleTeam then
+		nameColor, statusColor = kDeadColor, kDeadColor
+	end
+
+	player["Score"]:SetColor(baseColor)
+	player["Kills"]:SetColor(baseColor)
+	player["Assists"]:SetColor(baseColor)
+	player["Deaths"]:SetColor(baseColor)
+	player["Status"]:SetColor(statusColor)
+
+	player["Name"]:SetColor(nameColor)
+
+	-- resource color
+	if resourcesStr then
+		local resourcesNumber = tonumber(resourcesStr)
+		if resourcesNumber == nil then -- necessary at gamestart with bots
+			resourcesNumber = 0
+		end
+		if resourcesNumber < GUIScoreboard.kHighPresThreshold then
+			player["Resources"]:SetColor(baseColor)
+        elseif resourcesNumber >= GUIScoreboard.kMaxPresThreshold then
+            player["Resources"]:SetColor(GUIScoreboard.kMaxPresColor)
+		elseif resourcesNumber >= GUIScoreboard.kVeryHighPresThreshold then
+			player["Resources"]:SetColor(GUIScoreboard.kVeryHighPresColor)
+		else
+			player["Resources"]:SetColor(GUIScoreboard.kHighPresColor)
+		end
+	else
+		player["Resources"]:SetColor(baseColor)
+	end
+
+	if ping < GUIScoreboard.kLowPingThreshold then
+		player["Ping"]:SetColor(GUIScoreboard.kLowPingColor)
+	elseif ping < GUIScoreboard.kMedPingThreshold then
+		player["Ping"]:SetColor(GUIScoreboard.kMedPingColor)
+	elseif ping < GUIScoreboard.kHighPingThreshold then
+		player["Ping"]:SetColor(GUIScoreboard.kHighPingColor)
+	else
+		player["Ping"]:SetColor(GUIScoreboard.kInsanePingColor)
+	end
+
+end
+
+function GUIScoreboard:UpdateTeam__backgroundColor(player, playerRecord, teamColor)
+	PROFILE("GUIScoreboard:UpdateTeam__backgroundColor")
+
+	local clientIndex = playerRecord.ClientIndex
+	local steamId = GetSteamIdForClientIndex(clientIndex)
+	local teamNumber = playerRecord.EntityTeamNumber
+	local isLastComm = lastComm[teamNumber] == steamId
+	local isVisibleTeam = GetIsVisibleTeam(teamNumber)
+	local isCommander = playerRecord.IsCommander and isVisibleTeam == true
+	local isBot = steamId == 0
+
+	local color = Color(0.5, 0.5, 0.5, 1)
+	if isCommander or (isLastComm and not isBot) then
+		color = GUIScoreboard.kCommanderFontColor * 0.8
+	else
+		color = teamColor * 0.8
+	end
+
+	if not self.hoverMenu.background:GetIsVisible() and not MainMenu_GetIsOpened() then
+		if MouseTracker_GetIsVisible() then
+			local mouseX, mouseY = Client.GetCursorPosScreen()
+			if GUIItemContainsPoint(player["Background"], mouseX, mouseY) then
+				local canHighlight = true
+				local hoverBadge = false
+				for _, icon in ipairs(player["IconTable"]) do
+					if icon:GetIsVisible() and GUIItemContainsPoint(icon, mouseX, mouseY) and not icon.allowHighlight then
+						canHighlight = false
+						break
+					end
+				end
+
+				for i = 1, #player.BadgeItems do
+					local badgeItem = player.BadgeItems[i]
+					if GUIItemContainsPoint(badgeItem, mouseX, mouseY) and badgeItem:GetIsVisible() then
+						local _, badgeNames = Badges_GetBadgeTextures(clientIndex, "scoreboard")
+						local badge = ToString(badgeNames[i])
+						self.badgeNameTooltip:SetText(GetBadgeFormalName(badge))
+						hoverBadge = true
+						break
+					end
+				end
+
+				local skillIcon = player.SkillIcon
+				if skillIcon:GetIsVisible() and GUIItemContainsPoint(skillIcon, mouseX, mouseY) then
+					self.badgeNameTooltip:SetText(skillIcon.tooltipText)
+					hoverBadge = true
+				end
+
+				if canHighlight then
+					self.hoverPlayerClientIndex = clientIndex
+					player["Background"]:SetColor(color)
+				else
+					self.hoverPlayerClientIndex = 0
+				end
+
+				if hoverBadge then
+					self.badgeNameTooltip:Show()
+				else
+					self.badgeNameTooltip:Hide()
+				end
+			else
+				local overFavorite = GUIItemContainsPoint(self.favoriteButton, mouseX, mouseY)
+				local overBlocked = GUIItemContainsPoint(self.blockedButton, mouseX, mouseY)
+
+				if overFavorite then
+					self.favoriteButton:SetColor(kFavoriteMouseOverColor)
+				else
+					self.favoriteButton:SetColor(kFavoriteColor)
+				end
+
+				if overBlocked then
+					self.blockedButton:SetColor(kBlockedMouseOverColor)
+				else
+					self.blockedButton:SetColor(kBlockedColor)
+				end
+			end
+		end
+	elseif steamId == GetSteamIdForClientIndex(self.hoverPlayerClientIndex) then
+		player["Background"]:SetColor(color)
+	end
+end
+
 function GUIScoreboard:UpdateTeam(updateTeam)
-	PROFILE("ESB:GUIScoreboard:UpdateTeam")
+
+	PROFILE("GUIScoreboard:UpdateTeam")
+
 	local teamGUIItem = updateTeam["GUIs"]["Background"]
 	local teamNameGUIItem = updateTeam["GUIs"]["TeamName"]
 	local teamSkillGUIItem = updateTeam["GUIs"]["TeamSkill"]
@@ -1108,11 +1677,10 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 	end
 
 	local currentY = (GUIScoreboard.kTeamNameFontSize + GUIScoreboard.kTeamInfoFontSize + 10) * GUIScoreboard.kScalingFactor
-	local currentPlayerIndex = 1
-	local deadString = Locale.ResolveString("STATUS_DEAD")
 
 	local sumPlayerSkill = 0
 	local numPlayerSkill = 0
+
 	local numRookies = 0
 	local numBots = 0
 
@@ -1127,7 +1695,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 	local isSpectating = false
 	local commRage = lastComm[teamNumber] ~= nil
 	for index, player in ipairs(playerList) do
-		local playerRecord = teamScores[currentPlayerIndex]
+		local playerRecord = teamScores[index]
 		local playerName = playerRecord.Name
 		local clientIndex = playerRecord.ClientIndex
 		local steamId = GetSteamIdForClientIndex(clientIndex)
@@ -1136,26 +1704,27 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		local assists = playerRecord.Assists
 		local deaths = playerRecord.Deaths
 		local isCommander = playerRecord.IsCommander and isVisibleTeam == true
-		local isRookie = playerRecord.IsRookie
-		local resourcesStr = ConditionalValue(isVisibleTeam, tostring(math.floor(playerRecord.Resources * 10) / 10), "-")
-		local ping = playerRecord.Ping
-		local pingStr = tostring(ping)
+
 		local currentPosition = Vector(player["Background"]:GetPosition())
-		local playerStatus = isVisibleTeam and playerRecord.Status or "-"
-		local isDead = isVisibleTeam and playerRecord.Status == deadString
 		local isSteamFriend = playerRecord.IsSteamFriend
 		local playerSkill = playerRecord.Skill or 0
 		local adagradSum = playerRecord.AdagradSum
 		local commanderColor = GUIScoreboard.kCommanderFontColor
-		local isBot = steamId == 0
 		local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
 		if steamId == localPlayerSteamID and playerRecord.IsSpectator then
 			isSpectating = true
 		end
-		local playerCommSkillTier, playerCommSkillTierName = GetPlayerSkillTier(playerRecord.playerCommSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
 
-		-- Get data for tooltip
-		local playerTooltipData = (steamId and steamId > 0 and not isBot) and getPlayerStats(steamId) or nil
+		local isBot = steamId == 0
+		local isRookie = playerRecord.IsRookie
+		numRookies = numRookies + (isRookie and 1 or 0)
+		numBots = numBots + (isBot and 1 or 0)
+
+		local _, _, cappedSkill = GetPlayerSkillTier(playerSkill, isRookie, adagradSum, isBot)
+		if cappedSkill then
+			sumPlayerSkill = sumPlayerSkill + cappedSkill
+			numPlayerSkill = numPlayerSkill + 1
+		end
 
 		--Update comm variables
 		if playerRecord.IsCommander and lastComm[teamNumber] ~= steamId then
@@ -1163,375 +1732,22 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		end
 		local isLastComm = lastComm[teamNumber] == steamId
 
-		-- Update commander text based on lastComm
-		if isLastComm or isCommander then
-			commRage = false --Check for Commander Rage quit
-			teamInfoGUIItem["teamComm"]:SetText(playerName)
-		end
-
-		if isVisibleTeam and teamNumber == kTeam1Index then
-			if table.icontains(currentTech, kTechId.Jetpack) then
-				if playerStatus ~= "" and playerStatus ~= " " then
-					playerStatus = string.format("%s/%s", playerStatus, Locale.ResolveString("STATUS_JETPACK"))
-				else
-					playerStatus = Locale.ResolveString("STATUS_JETPACK")
-				end
-			end
-			if table.icontains(currentTech, kTechId.DualMinigunExosuit) then
-				if playerStatus ~= "" and playerStatus ~= " " then
-					playerStatus = string.format("%s-%s", playerStatus, "Mini")
-				else
-					playerStatus = Locale.ResolveString("HELP_SCREEN_EXO_MINIGUN")
-				end
-			elseif table.icontains(currentTech, kTechId.DualRailgunExosuit) then
-				if playerStatus ~= "" and playerStatus ~= " " then
-					playerStatus = string.format("%s-%s", playerStatus, "Rail")
-				else
-					playerStatus = Locale.ResolveString("HELP_SCREEN_EXO_RAILGUN")
-				end
-			end
-		end
-
-		if (isCommander or (isLastComm and not isBot)) and isPlayingTeam then
-			score = "*"
-			if playerCommSkillTier > 0 then
-				player.CommIcon:SetTexturePixelCoordinates(0, (playerCommSkillTier + 1) * 32, 32, (playerCommSkillTier + 2) * 32)
-			else
-				player.CommIcon:SetTexturePixelCoordinates(0, 0, 32, 32)
-			end
-			player.CommIcon:SetIsVisible(true)
-		else
-			player.CommIcon:SetIsVisible(false)
-		end
-
-		-- Upgrade Icons handle
-		-- -- Marines
-		local showTech = isVisibleTeam and teamNumber == kTeam1Index
-		if showTech and table.icontains(currentTech, kTechId.Welder) then
-			player.UpgradeIcons["marineWelder"]:SetIsVisible(true)
-		else
-			player.UpgradeIcons["marineWelder"]:SetIsVisible(false)
-		end
-		if showTech and (table.icontains(currentTech, kTechId.GasGrenade) or table.icontains(currentTech, kTechId.ClusterGrenade) or table.icontains(currentTech, kTechId.PulseGrenade)) then
-			player.UpgradeIcons["marineGrenade"]:SetIsVisible(true)
-		else
-			player.UpgradeIcons["marineGrenade"]:SetIsVisible(false)
-		end
-		if showTech and table.icontains(currentTech, kTechId.Mine) then
-			player.UpgradeIcons["marineMine"]:SetIsVisible(true)
-		else
-			player.UpgradeIcons["marineMine"]:SetIsVisible(false)
-		end
-
-		-- -- Aliens
-		local showTech = isVisibleTeam and teamNumber == kTeam2Index
-		if showTech and (table.icontains(currentTech, kTechId.Regeneration) or table.icontains(currentTech, kTechId.Carapace) or table.icontains(currentTech, kTechId.Vampirism)) then
-			player.UpgradeIcons["alienShell"]:SetIsVisible(true)
-			if table.icontains(currentTech, kTechId.Regeneration) then
-				if techCarapaceWorkaround then
-					player.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
-				end
-				player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 12, 113 * 1, 114 * 13}))
-			elseif table.icontains(currentTech, kTechId.Carapace) then
-				if techCarapaceWorkaround then
-					player.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
-					player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
-				else
-					player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 12, 113 * 2, 114 * 13}))
-				end
-			elseif table.icontains(currentTech, kTechId.Vampirism) then
-				if techCarapaceWorkaround then
-					player.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
-				end
-				player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 12, 113 * 3, 114 * 13}))
-			end
-		elseif techCarapaceWorkaround and showTech and table.icontains(currentTech, kTechId.Resilience) then
-			player.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
-			player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
-			player.UpgradeIcons["alienShell"]:SetIsVisible(true)
-		else
-			player.UpgradeIcons["alienShell"]:SetIsVisible(false)
-		end
-
-		if showTech and (table.icontains(currentTech, kTechId.Camouflage) or table.icontains(currentTech, kTechId.Focus) or table.icontains(currentTech, kTechId.Aura)) then
-			player.UpgradeIcons["alienVeil"]:SetIsVisible(true)
-			if table.icontains(currentTech, kTechId.Camouflage) then
-				player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 13, 113 * 1, 114 * 14}))
-			elseif table.icontains(currentTech, kTechId.Focus) then
-				player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 13, 113 * 2, 114 * 14}))
-			elseif table.icontains(currentTech, kTechId.Aura) then
-				player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 13, 113 * 3, 114 * 14}))
-			end
-		else
-			player.UpgradeIcons["alienVeil"]:SetIsVisible(false)
-		end
-		if showTech and (table.icontains(currentTech, kTechId.Adrenaline) or table.icontains(currentTech, kTechId.Celerity) or table.icontains(currentTech, kTechId.Crush)) then
-			player.UpgradeIcons["alienSpur"]:SetIsVisible(true)
-			if table.icontains(currentTech, kTechId.Adrenaline) then
-				player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 14, 113 * 1, 114 * 15}))
-			elseif table.icontains(currentTech, kTechId.Celerity) then
-				player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 14, 113 * 2, 114 * 15}))
-			elseif table.icontains(currentTech, kTechId.Crush) then
-				player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 14, 113 * 3, 114 * 15}))
-			end
-		else
-			player.UpgradeIcons["alienSpur"]:SetIsVisible(false)
-		end
+		self:UpdateTeam__commanderName(player, playerRecord, teamInfoGUIItem)
+		self:UpdateTeam__upgradesIcons(player, playerRecord)
 
 		currentPosition.y = currentY
 		player["Background"]:SetPosition(currentPosition)
 		player["Background"]:SetColor(ConditionalValue(isCommander, commanderColor, teamColor))
 
-		-- Handle local player highlight
-		if ScoreboardUI_IsPlayerLocal(playerName) then
-			if self.playerHighlightItem:GetParent() ~= player["Background"] then
-				if self.playerHighlightItem:GetParent() ~= nil then
-					self.playerHighlightItem:GetParent():RemoveChild(self.playerHighlightItem)
-				end
-				player["Background"]:AddChild(self.playerHighlightItem)
-				self.playerHighlightItem:SetIsVisible(true)
-				self.playerHighlightItem:SetColor(localPlayerHighlightColor)
-			end
-		end
-
 		player["Number"]:SetText(index .. ".")
 		player["Name"]:SetText(playerName)
-
-		-- Needed to determine who to (un)mute when voice icon is clicked.
 		player["ClientIndex"] = clientIndex
 
-		-- Voice icon.
-		local playerVoiceColor = GUIScoreboard.kVoiceDefaultColor
-		local voiceChannel = clientIndex and ChatUI_GetVoiceChannelForClient(clientIndex) or VoiceChannel.Invalid
-		if ChatUI_GetClientMuted(clientIndex) then
-			playerVoiceColor = GUIScoreboard.kVoiceMuteColor
-		elseif voiceChannel ~= VoiceChannel.Invalid then
-			playerVoiceColor = teamColor
-		end
+		self:UpdateTeam__highlightCurrentPlayer(player, playerRecord) -- Move after ?
 
-		-- Set player skill icon
-		local skillIconOverrideSettings = CheckForSpecialBadgeRecipient(steamId)
-		if skillIconOverrideSettings then
-			-- User has a special skill-tier icon tied to their steam Id.
-
-			-- Reset the skill icon's texture coordinates to the default normalized coordinates (0, 0), (1, 1).
-			-- The shader depends on them being this way.
-			player.SkillIcon:SetTextureCoordinates(0, 0, 1, 1)
-
-			-- Change the skill icon's shader to the one that will animate.
-			player.SkillIcon:SetShader(skillIconOverrideSettings.shader)
-			player.SkillIcon:SetTexture(skillIconOverrideSettings.tex)
-			player.SkillIcon:SetFloatParameter("frameCount", skillIconOverrideSettings.frameCount)
-
-			-- Change the size so it doesn't touch the weapon name text.
-			player.SkillIcon:SetSize(kPlayerSkillIconSizeOverride * GUIScoreboard.kScalingFactor)
-
-			-- Change the tooltip of the skill icon.
-			player.SkillIcon.tooltipText = skillIconOverrideSettings.tooltip
-		else
-			-- User has no special skill-tier icon.
-
-			-- Reset the shader and texture back to the default one.
-			player.SkillIcon:SetShader("shaders/GUIBasic.surface_shader")
-			player.SkillIcon:SetTexture(kPlayerSkillIconTexture)
-			player.SkillIcon:SetSize(kPlayerSkillIconSize * GUIScoreboard.kScalingFactor)
-
-			local skillTier, tierName, cappedSkill = GetPlayerSkillTier(playerSkill, isRookie, adagradSum, isBot)
-			player.SkillIcon.tooltipText = string.format(Locale.ResolveString("SKILLTIER_TOOLTIP"), Locale.ResolveString(tierName), skillTier)
-
-			local iconIndex = skillTier + 2
-			player.SkillIcon:SetTexturePixelCoordinates(0, iconIndex * 32, 100, (iconIndex + 1) * 32 - 1)
-
-			if cappedSkill then
-				sumPlayerSkill = sumPlayerSkill + cappedSkill
-				numPlayerSkill = numPlayerSkill + 1
-			end
-		end
-
-		if isBot then
-			player.SkillIcon.tooltipText = "NS2 Bot"
-		elseif not playerTooltipData then
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
-			if isSpectator or isMarine or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
-			end
-			if isSpectator or isAlien or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
-			end
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
-			end
-			if isSpectator or (isLastComm and isMarine) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
-			end
-			if isSpectator or (isLastComm and isAlien) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
-			end
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nRequesting NS2Panel data..."
-		elseif playerTooltipData and playerTooltipData.fetched and playerTooltipData.fetched == 0 then
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
-			if isSpectator or isMarine or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
-			end
-			if isSpectator or isAlien or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
-			end
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
-			end
-			if isSpectator or (isLastComm and isMarine) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
-			end
-			if isSpectator or (isLastComm and isAlien) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
-			end
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nNo NS2Panel data!"
-		elseif not isBot and playerTooltipData and playerTooltipData.marine_skill then
-			--local midPlayerSkill = ((playerRecord.marineSkill or 0) + (playerRecord.alienSkill or 0)) / 2
-
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
-			if isSpectator or isMarine or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
-			end
-			if isSpectator or isAlien or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
-			end
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
-			end
-			if isSpectator or (isLastComm and isMarine) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
-			end
-			if isSpectator or (isLastComm and isAlien) or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
-			end
-			if isSpectator or isLastComm or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nKDR:"
-			if isSpectator or isMarine or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " M " .. tostring(playerTooltipData.marine_kdr or 0)
-			end
-			if isSpectator or isAlien or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " A " .. tostring(playerTooltipData.alien_kdr or 0)
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAccuracy:"
-			if isSpectator or isMarine or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " M " .. tostring(round(playerTooltipData.marine_accuracy or 0, 0))
-			end
-			if isSpectator or isAlien or isPreGame then
-				player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " A " .. tostring(round(playerTooltipData.alien_accuracy or 0, 0))
-			end
-			player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nProvided by NS2Panel"
-			playerTooltipData.toolTip = player.SkillIcon.tooltipText
-		end
-
-		numRookies = numRookies + (isRookie and 1 or 0)
-		numBots = numBots + (isBot and 1 or 0)
-		if isPlayingTeam then
-			player["Score"]:SetText(tostring(score))
-			player["Kills"]:SetText(tostring(kills))
-			player["Assists"]:SetText(tostring(assists))
-			player["Deaths"]:SetText(tostring(deaths))
-			player["Resources"]:SetText(resourcesStr)
-		end
-		player["Status"]:SetText(playerStatus)
-		player["Ping"]:SetText(pingStr)
-
-		player["Score"]:SetIsVisible(isPlayingTeam)
-		player["Kills"]:SetIsVisible(isPlayingTeam)
-		player["Assists"]:SetIsVisible(isPlayingTeam)
-		player["Deaths"]:SetIsVisible(isPlayingTeam)
-		player["Resources"]:SetIsVisible(isPlayingTeam)
-
-		local white = GUIScoreboard.kWhiteColor
-		local baseColor, nameColor, statusColor = white, white, white
-
-		if isDead and isVisibleTeam then
-			nameColor, statusColor = kDeadColor, kDeadColor
-		end
-
-		player["Score"]:SetColor(baseColor)
-		player["Kills"]:SetColor(baseColor)
-		player["Assists"]:SetColor(baseColor)
-		player["Deaths"]:SetColor(baseColor)
-		player["Status"]:SetColor(statusColor)
-
-		player["Name"]:SetColor(nameColor)
-
-		-- resource color
-		if resourcesStr then
-			local resourcesNumber = tonumber(resourcesStr)
-			if resourcesNumber == nil then -- necessary at gamestart with bots
-				resourcesNumber = 0
-			end
-			if resourcesNumber < GUIScoreboard.kHighPresThreshold then
-				player["Resources"]:SetColor(baseColor)
-            elseif resourcesNumber >= GUIScoreboard.kMaxPresThreshold then
-                player["Resources"]:SetColor(GUIScoreboard.kMaxPresColor)
-			elseif resourcesNumber >= GUIScoreboard.kVeryHighPresThreshold then
-				player["Resources"]:SetColor(GUIScoreboard.kVeryHighPresColor)
-			else
-				player["Resources"]:SetColor(GUIScoreboard.kHighPresColor)
-			end
-		else
-			player["Resources"]:SetColor(baseColor)
-		end
-
-		if ping < GUIScoreboard.kLowPingThreshold then
-			player["Ping"]:SetColor(GUIScoreboard.kLowPingColor)
-		elseif ping < GUIScoreboard.kMedPingThreshold then
-			player["Ping"]:SetColor(GUIScoreboard.kMedPingColor)
-		elseif ping < GUIScoreboard.kHighPingThreshold then
-			player["Ping"]:SetColor(GUIScoreboard.kHighPingColor)
-		else
-			player["Ping"]:SetColor(GUIScoreboard.kInsanePingColor)
-		end
-		currentY = currentY + (GUIScoreboard.kPlayerItemHeight + GUIScoreboard.kPlayerSpacing) * GUIScoreboard.kScalingFactor
-		currentPlayerIndex = currentPlayerIndex + 1
-
-		-- New scoreboard positioning
-		local numberSize = 0
-		if player["Number"]:GetIsVisible() then
-			numberSize = kPlayerNumberWidth
-		end
-
-		for i = 1, #player["BadgeItems"] do
-			player["BadgeItems"][i]:SetPosition(Vector(numberSize + kPlayerItemLeftMargin + (i - 1) * kPlayerVoiceChatIconSize + (i - 1) * kPlayerBadgeRightPadding, -kPlayerVoiceChatIconSize / 2, 0) * GUIScoreboard.kScalingFactor)
-		end
-
-		local statusPos = ConditionalValue(GUIScoreboard.screenWidth < 1280, GUIScoreboard.kPlayerItemWidth + 30, (self:GetTeamItemWidth() - GUIScoreboard.kTeamColumnSpacingX * 10) + 60)
-		playerStatus = player["Status"]:GetText()
-		if playerStatus == "-" or (playerStatus ~= Locale.ResolveString("STATUS_SPECTATOR") and teamNumber ~= 1 and teamNumber ~= 2) then
-			playerStatus = ""
-			player["Status"]:SetText("")
-			statusPos = statusPos + GUIScoreboard.kTeamColumnSpacingX * ConditionalValue(GUIScoreboard.screenWidth < 1280, 2.75, 1.75)
-		end
-
-		SetPlayerItemBadges(player, Badges_GetBadgeTextures(clientIndex, "scoreboard"))
-
-		local numBadges = math.min(#Badges_GetBadgeTextures(clientIndex, "scoreboard"), #player["BadgeItems"])
-		local pos = (numberSize + kPlayerItemLeftMargin + numBadges * kPlayerVoiceChatIconSize + numBadges * kPlayerBadgeRightPadding) * GUIScoreboard.kScalingFactor
-
-		player["Name"]:SetPosition(Vector(pos, 0, 0))
+		self:UpdateTeam__skillIcons(player, playerRecord)
+		self:UpdateTeam__statsValues(player, playerRecord)
+		self:UpdateTeam__playersPlaceAndName(player, playerRecord)
 
 		-- Icons on the right side of the player name
 		player["SteamFriend"]:SetIsVisible(isSteamFriend)
@@ -1542,96 +1758,9 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		--player["Voice"]:SetIsVisible(true)
 		--player["Text"]:SetIsVisible(true)
 
-		local nameRightPos = pos + (kPlayerBadgeRightPadding * GUIScoreboard.kScalingFactor)
+		self:UpdateTeam__backgroundColor(player, playerRecord, teamColor)
 
-		pos = player.SkillIcon:GetPosition().x
-		for _, icon in ipairs(player["IconTable"]) do
-			if icon:GetIsVisible() then
-				local iconSize = icon:GetSize()
-				pos = pos - iconSize.x
-				icon:SetPosition(Vector(pos, (-iconSize.y / 2), 0))
-			end
-		end
-
-		local finalName = player["Name"]:GetText()
-		local finalNameWidth = player["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor
-		local dotsWidth = player["Name"]:GetTextWidth("...") * GUIScoreboard.kScalingFactor
-		-- The minimum truncated length for the name also includes the "..."
-		while nameRightPos + finalNameWidth > pos and string.UTF8Length(finalName) > kMinTruncatedNameLength do
-			finalName = string.UTF8Sub(finalName, 1, string.UTF8Length(finalName) - 1)
-			finalNameWidth = (player["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor) + dotsWidth
-			player["Name"]:SetText(finalName .. "...")
-		end
-
-		local color = Color(0.5, 0.5, 0.5, 1)
-		if isCommander or (isLastComm and not isBot) then
-			color = GUIScoreboard.kCommanderFontColor * 0.8
-		else
-			color = teamColor * 0.8
-		end
-
-		if not self.hoverMenu.background:GetIsVisible() and not MainMenu_GetIsOpened() then
-			if MouseTracker_GetIsVisible() then
-				local mouseX, mouseY = Client.GetCursorPosScreen()
-				if GUIItemContainsPoint(player["Background"], mouseX, mouseY) then
-					local canHighlight = true
-					local hoverBadge = false
-					for _, icon in ipairs(player["IconTable"]) do
-						if icon:GetIsVisible() and GUIItemContainsPoint(icon, mouseX, mouseY) and not icon.allowHighlight then
-							canHighlight = false
-							break
-						end
-					end
-
-					for i = 1, #player.BadgeItems do
-						local badgeItem = player.BadgeItems[i]
-						if GUIItemContainsPoint(badgeItem, mouseX, mouseY) and badgeItem:GetIsVisible() then
-							local _, badgeNames = Badges_GetBadgeTextures(clientIndex, "scoreboard")
-							local badge = ToString(badgeNames[i])
-							self.badgeNameTooltip:SetText(GetBadgeFormalName(badge))
-							hoverBadge = true
-							break
-						end
-					end
-
-					local skillIcon = player.SkillIcon
-					if skillIcon:GetIsVisible() and GUIItemContainsPoint(skillIcon, mouseX, mouseY) then
-						self.badgeNameTooltip:SetText(skillIcon.tooltipText)
-						hoverBadge = true
-					end
-
-					if canHighlight then
-						self.hoverPlayerClientIndex = clientIndex
-						player["Background"]:SetColor(color)
-					else
-						self.hoverPlayerClientIndex = 0
-					end
-
-					if hoverBadge then
-						self.badgeNameTooltip:Show()
-					else
-						self.badgeNameTooltip:Hide()
-					end
-				else
-					local overFavorite = GUIItemContainsPoint(self.favoriteButton, mouseX, mouseY)
-					local overBlocked = GUIItemContainsPoint(self.blockedButton, mouseX, mouseY)
-
-					if overFavorite then
-						self.favoriteButton:SetColor(kFavoriteMouseOverColor)
-					else
-						self.favoriteButton:SetColor(kFavoriteColor)
-					end
-
-					if overBlocked then
-						self.blockedButton:SetColor(kBlockedMouseOverColor)
-					else
-						self.blockedButton:SetColor(kBlockedColor)
-					end
-				end
-			end
-		elseif steamId == GetSteamIdForClientIndex(self.hoverPlayerClientIndex) then
-			player["Background"]:SetColor(color)
-		end
+		currentY = currentY + (GUIScoreboard.kPlayerItemHeight + GUIScoreboard.kPlayerSpacing) * GUIScoreboard.kScalingFactor
 	end
 
 	--Is spectating handle
@@ -1644,7 +1773,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 		lastComm[teamNumber] = nil
 	end
 
-	--todo text
+	--Team skill avg icon
 	numPlayers = #playerList
 	if isPlayingTeam and teamSkillGUIItem.sumPlayerSkill ~= sumPlayerSkill then
 		if numPlayers > 0 then
@@ -2492,7 +2621,6 @@ local function CreateEALIcon(container, Texture, TextureVector, TextureSize, Ico
 		ColumnSpacing = ColumnSpacing / 1.25
 	end
 	StartSpacing = GUILinearScale(StartSpacing)
-	--Assign a count variable for later use
 	item.count = 0
 
 	item.icon = GUIManager:CreateGraphicItem()
