@@ -109,11 +109,9 @@ local kPlayerCommIconsTexture = PrecacheAsset("ui/Devnull/ComSkillBadges.dds")
 local kMarineStatsLogo = PrecacheAsset("ui/logo_marine.dds")
 local kAlienStatsLogo = PrecacheAsset("ui/logo_alien.dds")
 local lastComm = {}
-lastComm[kMarineTeamType] = nil
-lastComm[kAlienTeamType] = nil
 local isPreGame = false
 local localPlayerIsSpectator = false
-local localPlayerSteamID = Client:GetSteamId()
+local localPlayerSteamID = 0
 local kHeaderCoordsLeft = {0, 0, 15, 64}
 local kHeaderCoordsMiddle = {16, 0, 112, 64}
 local kHeaderCoordsRight = {113, 0, 128, 64}
@@ -144,8 +142,12 @@ local lastScoreboardVisState = false
 local kSteamProfileURL = "http://steamcommunity.com/profiles/"
 local kNS2PanelProfileURL = "https://ns2panel.com/player/%s"
 local kMinTruncatedNameLength = 8
-local lowResScreen = (Client.GetScreenWidth() < 1800) and true or false
+local lowResScreen = false
 local kGUIdata = {}
+
+local guiThrottleInterval = 0.6
+local guiThrottleTime = {}
+
 
 -- Color constants.
 GUIScoreboard.kBlueColor = ColorIntToColor(kMarineTeamColor)
@@ -527,6 +529,14 @@ function GUIScoreboard:Initialize()
     kGUIdata.contentYSize = 0
 
     self.visible = false
+
+	lowResScreen = (Client.GetScreenWidth() < 1800) and true or false
+	localPlayerSteamID = Client:GetSteamId()
+
+	guiThrottleTime[kMarineTeamType] = 0
+	guiThrottleTime[kAlienTeamType] = 0
+	lastComm[kMarineTeamType] = nil
+	lastComm[kAlienTeamType] = nil
 
     -- Carapace workaround for CBM
     techCarapaceWorkaround = enumContainElement(kTechId, "Resilience")
@@ -1763,13 +1773,11 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     end
 
     -- EAL update
-    -- Reset counts
-    for index, item in ipairs(EALitems) do
-        item.count = 0
-    end
+    if teamObject.isVisibleTeam and teamObject.isPlayingTeam and guiThrottleTime[teamObject.teamNumber] and guiThrottleTime[teamObject.teamNumber] < Shared.GetTime() then
+		for index, item in ipairs(EALitems) do
+        	item.count = 0
+    	end
 
-    -- Update counts
-    if teamObject.isVisibleTeam then
         local lifeformCount = 0
         if teamObject.teamNumber == kTeam1Index then
             lifeformCount = 0
@@ -2008,6 +2016,8 @@ function GUIScoreboard:UpdateTeam(updateTeam)
                 end
             end
         end
+
+		guiThrottleTime[teamObject.teamNumber] = Shared.GetTime() + guiThrottleInterval
     end
 
     -- Enable/Disable topbar
