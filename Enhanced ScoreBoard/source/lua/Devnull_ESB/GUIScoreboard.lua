@@ -109,8 +109,9 @@ local kPlayerCommIconsTexture = PrecacheAsset("ui/Devnull/ComSkillBadges.dds")
 local kMarineStatsLogo = PrecacheAsset("ui/logo_marine.dds")
 local kAlienStatsLogo = PrecacheAsset("ui/logo_alien.dds")
 local lastComm = {}
-lastComm[kTeam1Index] = nil
-lastComm[kTeam2Index] = nil
+lastComm[kMarineTeamType] = nil
+lastComm[kAlienTeamType] = nil
+local isPreGame = false
 local localPlayerIsSpectator = false
 local localPlayerSteamID = Client:GetSteamId()
 local kHeaderCoordsLeft = {0, 0, 15, 64}
@@ -765,25 +766,29 @@ end
 
 local function GetIsVisibleTeam(teamNumber)
     PROFILE("GUIScoreboard:GetIsVisibleTeam")
-    local isVisibleTeam = false
-    local localPlayer = Client.GetLocalPlayer()
+
+	-- Check what we can without extra processing
+	if localPlayerIsSpectator or teamNumber == kTeamReadyRoom then
+		return true
+	end
+
+	local localPlayer = Client.GetLocalPlayer()
     if localPlayer then
         local localPlayerTeamNum = localPlayer:GetTeamNumber()
         -- Can see secret information if the player is on the team or is a spectator.
-        if localPlayerIsSpectator or teamNumber == kTeamReadyRoom or localPlayerTeamNum == teamNumber or localPlayerTeamNum == kSpectatorIndex then
-            isVisibleTeam = true
-        end
-    end
-
-    if not isVisibleTeam then
-        -- Allow seeing who is commander during pre-game
-        local gInfo = GetGameInfoEntity()
-        if gInfo and gInfo:GetState() <= kGameState.PreGame then
+        if localPlayerTeamNum == teamNumber or localPlayerTeamNum == kSpectatorIndex then
             return true
         end
     end
 
-    return isVisibleTeam
+
+	-- Allow seeing who is commander during pre-game
+	if isPreGame then
+		return true
+	end
+
+
+    return false
 end
 
 function GUIScoreboard:Update_topBarMode()
@@ -799,7 +804,7 @@ function GUIScoreboard:Update_topBarMode()
             topBar:SetIsVisible(not vis)
         end
     else
-        topBar = ClientUI.GetScript("Hud2/topBar/GUIHudTopBarForLocalTeam")
+        topBar = ClientUI.GetScript("Hud2/topBar/GUIHudTopBarForLocalTeam") -- ToDo: create object for this script at initialization, then get it here
 
         if topBar then
             topBar:SetIsHiddenOverride(vis)
@@ -808,15 +813,12 @@ function GUIScoreboard:Update_topBarMode()
 end
 
 -- Current commander/last-commander info
-function GUIScoreboard:Update_teamsInfo()
-    PROFILE("GUIScoreboard:Update_teamsInfo")
+function GUIScoreboard:Update_TeamsInfo()
+    PROFILE("GUIScoreboard:Update_TeamsInfo")
 
     local vis = self.visible and not self.hiddenOverride
     local teamGUISize = {}
     local fetchTable = {}
-
-    local gInfo = GetGameInfoEntity()
-    local isPreGame = gInfo and gInfo:GetState() <= kGameState.PreGame
 
     for index, team in ipairs(self.teams) do
 
@@ -886,9 +888,9 @@ function GUIScoreboard:Update_GUIElements(deltaTime, contentXSize, contentYSize)
     local seconds = math.floor(gameTime - minutes * 60)
 
     local gInfo = GetGameInfoEntity()
-    local serverPop = gInfo:GetNumClientsTotal()
-    local serverPopText = serverPopulation == 1 and tostring(serverPop) .. " player" or tostring(serverPop) .. " players"
-    local gameTimeText = serverName .. " | " .. serverPopText .. " | " .. mapName .. string.format(" - %d:%02d", minutes, seconds)
+    local serverPopulation = gInfo:GetNumClientsTotal()
+    local serverPopulationText = serverPopulation == 1 and tostring(serverPopulation) .. " " .. string.lower(Locale.ResolveString("PLAYER")) or tostring(serverPopulation) .. " " .. string.lower(Locale.ResolveString("PLAYERS"))
+    local gameTimeText = serverName .. " | " .. serverPopulationText .. " | " .. mapName .. string.format(" - %d:%02d", minutes, seconds)
 
     self.gameTime:SetText(gameTimeText)
 
@@ -1080,9 +1082,9 @@ function GUIScoreboard:Update(deltaTime)
 
     local vis = self.visible and not self.hiddenOverride
     local gInfo = GetGameInfoEntity()
-    local isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
+    isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
 
-    local fetchTable, teamGUISize = self:Update_teamsInfo()
+    local fetchTable, teamGUISize = self:Update_TeamsInfo()
     local contentXSize, contentYSize = self:Update_toNewSizes(teamGUISize)
 
     self:Update_topBarMode()
@@ -1098,6 +1100,7 @@ end
 
 local function SetPlayerItemBadges(item, badgeTextures)
     PROFILE("GUIScoreboard:SetPlayerItemBadges")
+
     assert(#badgeTextures <= #item.BadgeItems)
 
     local offset = 0
@@ -1121,6 +1124,7 @@ end
 
 local function GetCountByStatus(team, status, partof)
     PROFILE("GUIScoreboard:UpdateTeam")
+
     local count = 0
     for index, item in ipairs(team) do
         if partof and string.find(item["Status"], status) then
@@ -1133,12 +1137,11 @@ local function GetCountByStatus(team, status, partof)
 end
 
 function GUIScoreboard:UpdateTeam_CommanderName(playerObject, teamObject)
-
     PROFILE("GUIScoreboard:UpdateTeam_CommanderName")
 
     -- Update commander text based on lastComm
     if playerObject.isLastComm or playerObject.isCommander then
-        local commRage = false -- Check for Commander Rage quit
+        teamObject.commRage = false -- Check for Commander Rage quit
         teamObject.teamInfoGUIItem["teamComm"]:SetText(playerObject.playerName)
     end
 
@@ -1166,8 +1169,8 @@ function GUIScoreboard:UpdateTeam_CommanderName(playerObject, teamObject)
     end
 
     if (playerObject.isCommander or (playerObject.isLastComm and not playerObject.isBot)) and teamObject.isPlayingTeam then
-        if playerObject.playerCommSkillTier > 0 then
-            playerObject.playerGUIItem.CommIcon:SetTexturePixelCoordinates(0, (playerObject.playerCommSkillTier + 1) * 32, 32, (playerObject.playerCommSkillTier + 2) * 32)
+        if playerObject.comSkillTier > 0 then
+            playerObject.playerGUIItem.CommIcon:SetTexturePixelCoordinates(0, (playerObject.comSkillTier + 1) * 32, 32, (playerObject.comSkillTier + 2) * 32)
         else
             playerObject.playerGUIItem.CommIcon:SetTexturePixelCoordinates(0, 0, 32, 32)
         end
@@ -1179,86 +1182,81 @@ function GUIScoreboard:UpdateTeam_CommanderName(playerObject, teamObject)
     playerObject.playerGUIItem["Status"]:SetText(playerObject.playerStatus)
 end
 
-function GUIScoreboard:UpdateTeam__upgradesIcons(player, playerRecord)
-
-    PROFILE("GUIScoreboard:UpdateTeam__upgradesIcons")
-
-    local teamNumber = playerRecord.EntityTeamNumber
-    local isVisibleTeam = GetIsVisibleTeam(teamNumber)
-    local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
+function GUIScoreboard:UpdateTeam_UpgradesIcons(playerObject, teamObject)
+    PROFILE("GUIScoreboard:UpdateTeam_UpgradesIcons")
 
     -- Upgrade Icons handle
     -- -- Marines
-    local showTech = isVisibleTeam and teamNumber == kTeam1Index
-    if showTech and table.icontains(currentTech, kTechId.Welder) then
-        player.UpgradeIcons["marineWelder"]:SetIsVisible(true)
+    local showTech = teamObject.isVisibleTeam and playerObject.teamNumber == kTeam1Index
+    if showTech and table.icontains(playerObject.currentTech, kTechId.Welder) then
+        playerObject.playerGUIItem.UpgradeIcons["marineWelder"]:SetIsVisible(true)
     else
-        player.UpgradeIcons["marineWelder"]:SetIsVisible(false)
+        playerObject.playerGUIItem.UpgradeIcons["marineWelder"]:SetIsVisible(false)
     end
-    if showTech and (table.icontains(currentTech, kTechId.GasGrenade) or table.icontains(currentTech, kTechId.ClusterGrenade) or table.icontains(currentTech, kTechId.PulseGrenade)) then
-        player.UpgradeIcons["marineGrenade"]:SetIsVisible(true)
+    if showTech and (table.icontains(playerObject.currentTech, kTechId.GasGrenade) or table.icontains(playerObject.currentTech, kTechId.ClusterGrenade) or table.icontains(playerObject.currentTech, kTechId.PulseGrenade)) then
+        playerObject.playerGUIItem.UpgradeIcons["marineGrenade"]:SetIsVisible(true)
     else
-        player.UpgradeIcons["marineGrenade"]:SetIsVisible(false)
+        playerObject.playerGUIItem.UpgradeIcons["marineGrenade"]:SetIsVisible(false)
     end
-    if showTech and table.icontains(currentTech, kTechId.Mine) then
-        player.UpgradeIcons["marineMine"]:SetIsVisible(true)
+    if showTech and table.icontains(playerObject.currentTech, kTechId.Mine) then
+        playerObject.playerGUIItem.UpgradeIcons["marineMine"]:SetIsVisible(true)
     else
-        player.UpgradeIcons["marineMine"]:SetIsVisible(false)
+        playerObject.playerGUIItem.UpgradeIcons["marineMine"]:SetIsVisible(false)
     end
 
     -- -- Aliens
-    local showTech = isVisibleTeam and teamNumber == kTeam2Index
-    if showTech and (table.icontains(currentTech, kTechId.Regeneration) or table.icontains(currentTech, kTechId.Carapace) or table.icontains(currentTech, kTechId.Vampirism)) then
-        player.UpgradeIcons["alienShell"]:SetIsVisible(true)
-        if table.icontains(currentTech, kTechId.Regeneration) then
+    local showTech = teamObject.isVisibleTeam and playerObject.teamNumber == kTeam2Index
+    if showTech and (table.icontains(playerObject.currentTech, kTechId.Regeneration) or table.icontains(playerObject.currentTech, kTechId.Carapace) or table.icontains(playerObject.currentTech, kTechId.Vampirism)) then
+        playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetIsVisible(true)
+        if table.icontains(playerObject.currentTech, kTechId.Regeneration) then
             if techCarapaceWorkaround then
-                player.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
+                playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
             end
-            player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 12, 113 * 1, 114 * 13}))
-        elseif table.icontains(currentTech, kTechId.Carapace) then
+            playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 12, 113 * 1, 114 * 13}))
+        elseif table.icontains(playerObject.currentTech, kTechId.Carapace) then
             if techCarapaceWorkaround then
-                player.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
-                player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
+                playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
+                playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
             else
-                player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 12, 113 * 2, 114 * 13}))
+                playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 12, 113 * 2, 114 * 13}))
             end
-        elseif table.icontains(currentTech, kTechId.Vampirism) then
+        elseif table.icontains(playerObject.currentTech, kTechId.Vampirism) then
             if techCarapaceWorkaround then
-                player.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
+                playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexture(kEalAlienTexture)
             end
-            player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 12, 113 * 3, 114 * 13}))
+            playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 12, 113 * 3, 114 * 13}))
         end
-    elseif techCarapaceWorkaround and showTech and table.icontains(currentTech, kTechId.Resilience) then
-        player.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
-        player.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
-        player.UpgradeIcons["alienShell"]:SetIsVisible(true)
+    elseif techCarapaceWorkaround and showTech and table.icontains(playerObject.currentTech, kTechId.Resilience) then
+        playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexture(kBuildmenuTexture)
+        playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetTexturePixelCoordinates(GUIUnpackCoords({80 * 11, 80 * 13, 80 * 12, 80 * 14}))
+        playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetIsVisible(true)
     else
-        player.UpgradeIcons["alienShell"]:SetIsVisible(false)
+        playerObject.playerGUIItem.UpgradeIcons["alienShell"]:SetIsVisible(false)
     end
 
-    if showTech and (table.icontains(currentTech, kTechId.Camouflage) or table.icontains(currentTech, kTechId.Focus) or table.icontains(currentTech, kTechId.Aura)) then
-        player.UpgradeIcons["alienVeil"]:SetIsVisible(true)
-        if table.icontains(currentTech, kTechId.Camouflage) then
-            player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 13, 113 * 1, 114 * 14}))
-        elseif table.icontains(currentTech, kTechId.Focus) then
-            player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 13, 113 * 2, 114 * 14}))
-        elseif table.icontains(currentTech, kTechId.Aura) then
-            player.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 13, 113 * 3, 114 * 14}))
+    if showTech and (table.icontains(playerObject.currentTech, kTechId.Camouflage) or table.icontains(playerObject.currentTech, kTechId.Focus) or table.icontains(playerObject.currentTech, kTechId.Aura)) then
+        playerObject.playerGUIItem.UpgradeIcons["alienVeil"]:SetIsVisible(true)
+        if table.icontains(playerObject.currentTech, kTechId.Camouflage) then
+            playerObject.playerGUIItem.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 13, 113 * 1, 114 * 14}))
+        elseif table.icontains(playerObject.currentTech, kTechId.Focus) then
+            playerObject.playerGUIItem.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 13, 113 * 2, 114 * 14}))
+        elseif table.icontains(playerObject.currentTech, kTechId.Aura) then
+            playerObject.playerGUIItem.UpgradeIcons["alienVeil"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 13, 113 * 3, 114 * 14}))
         end
     else
-        player.UpgradeIcons["alienVeil"]:SetIsVisible(false)
+        playerObject.playerGUIItem.UpgradeIcons["alienVeil"]:SetIsVisible(false)
     end
-    if showTech and (table.icontains(currentTech, kTechId.Adrenaline) or table.icontains(currentTech, kTechId.Celerity) or table.icontains(currentTech, kTechId.Crush)) then
-        player.UpgradeIcons["alienSpur"]:SetIsVisible(true)
-        if table.icontains(currentTech, kTechId.Adrenaline) then
-            player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 14, 113 * 1, 114 * 15}))
-        elseif table.icontains(currentTech, kTechId.Celerity) then
-            player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 14, 113 * 2, 114 * 15}))
-        elseif table.icontains(currentTech, kTechId.Crush) then
-            player.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 14, 113 * 3, 114 * 15}))
+    if showTech and (table.icontains(playerObject.currentTech, kTechId.Adrenaline) or table.icontains(playerObject.currentTech, kTechId.Celerity) or table.icontains(playerObject.currentTech, kTechId.Crush)) then
+        playerObject.playerGUIItem.UpgradeIcons["alienSpur"]:SetIsVisible(true)
+        if table.icontains(playerObject.currentTech, kTechId.Adrenaline) then
+            playerObject.playerGUIItem.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 0, 114 * 14, 113 * 1, 114 * 15}))
+        elseif table.icontains(playerObject.currentTech, kTechId.Celerity) then
+            playerObject.playerGUIItem.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 1, 114 * 14, 113 * 2, 114 * 15}))
+        elseif table.icontains(playerObject.currentTech, kTechId.Crush) then
+            playerObject.playerGUIItem.UpgradeIcons["alienSpur"]:SetTexturePixelCoordinates(GUIUnpackCoords({113 * 2, 114 * 14, 113 * 3, 114 * 15}))
         end
     else
-        player.UpgradeIcons["alienSpur"]:SetIsVisible(false)
+        playerObject.playerGUIItem.UpgradeIcons["alienSpur"]:SetIsVisible(false)
     end
 end
 
@@ -1266,53 +1264,50 @@ function GUIScoreboard:UpdateTeam_HighlightCurrentPlayer(playerObject, teamObjec
     PROFILE("GUIScoreboard:UpdateTeam_HighlightCurrentPlayer")
 
     -- Handle local player highlight
-    if ScoreboardUI_IsPlayerLocal(playerObject.playerName) then
-        if self.playerHighlightItem:GetParent() ~= player["Background"] then
+    if ScoreboardUI_IsPlayerLocal(playerObject["playerName"]) then
+        if self.playerHighlightItem:GetParent() ~= playerObject.playerGUIItem["Background"] then
             if self.playerHighlightItem:GetParent() ~= nil then
                 self.playerHighlightItem:GetParent():RemoveChild(self.playerHighlightItem)
             end
-            player["Background"]:AddChild(self.playerHighlightItem)
+            playerObject.playerGUIItem["Background"]:AddChild(self.playerHighlightItem)
             self.playerHighlightItem:SetIsVisible(true)
             self.playerHighlightItem:SetColor(teamObject.localPlayerHighlightColor)
         end
     end
 end
 
-function GUIScoreboard:UpdateTeam__playersPlaceAndName(player, playerRecord)
-
+function GUIScoreboard:UpdateTeam_PlayersPlaceAndName(playerObject)
     PROFILE("GUIScoreboard:UpdateTeam__playersPlaceAndName")
-
-    local teamNumber = playerRecord.EntityTeamNumber
-    local clientIndex = playerRecord.ClientIndex
 
     -- New scoreboard positioning
     local numberSize = 0
-    if player["Number"]:GetIsVisible() then
+    if playerObject.playerGUIItem["Number"]:GetIsVisible() then
         numberSize = kPlayerNumberWidth
     end
 
-    for i = 1, #player["BadgeItems"] do
-        player["BadgeItems"][i]:SetPosition(Vector(numberSize + kPlayerItemLeftMargin + (i - 1) * kPlayerVoiceChatIconSize + (i - 1) * kPlayerBadgeRightPadding, -kPlayerVoiceChatIconSize / 2, 0) * GUIScoreboard.kScalingFactor)
+    for i = 1, #playerObject.playerGUIItem["BadgeItems"] do
+        playerObject.playerGUIItem["BadgeItems"][i]:SetPosition(Vector(numberSize + kPlayerItemLeftMargin + (i - 1) * kPlayerVoiceChatIconSize + (i - 1) * kPlayerBadgeRightPadding, -kPlayerVoiceChatIconSize / 2, 0) * GUIScoreboard.kScalingFactor)
     end
 
     local statusPos = ConditionalValue(GUIScoreboard.screenWidth < 1280, GUIScoreboard.kPlayerItemWidth + 30, (self:GetTeamItemWidth() - GUIScoreboard.kTeamColumnSpacingX * 10) + 60)
-    local playerStatus = player["Status"]:GetText()
-    if playerStatus == "-" or (playerStatus ~= Locale.ResolveString("STATUS_SPECTATOR") and teamNumber ~= 1 and teamNumber ~= 2) then
-        player["Status"]:SetText("")
+    local playerStatus = playerObject.playerGUIItem["Status"]:GetText()
+
+    if playerStatus == "-" or (playerStatus ~= Locale.ResolveString("STATUS_SPECTATOR") and playerObject["teamNumber"] ~= kTeam1Index and playerObject["teamNumber"] ~= kTeam2Index) then
+        playerObject.playerGUIItem["Status"]:SetText("")
         statusPos = statusPos + GUIScoreboard.kTeamColumnSpacingX * ConditionalValue(GUIScoreboard.screenWidth < 1280, 2.75, 1.75)
     end
 
-    SetPlayerItemBadges(player, Badges_GetBadgeTextures(clientIndex, "scoreboard"))
+    SetPlayerItemBadges(playerObject.playerGUIItem, Badges_GetBadgeTextures(playerObject["clientIndex"], "scoreboard"))
 
-    local numBadges = math.min(#Badges_GetBadgeTextures(clientIndex, "scoreboard"), #player["BadgeItems"])
+    local numBadges = math.min(#Badges_GetBadgeTextures(playerObject["clientIndex"], "scoreboard"), #playerObject.playerGUIItem["BadgeItems"])
     local pos = (numberSize + kPlayerItemLeftMargin + numBadges * kPlayerVoiceChatIconSize + numBadges * kPlayerBadgeRightPadding) * GUIScoreboard.kScalingFactor
 
-    player["Name"]:SetPosition(Vector(pos, 0, 0))
+    playerObject.playerGUIItem["Name"]:SetPosition(Vector(pos, 0, 0))
 
     local nameRightPos = pos + (kPlayerBadgeRightPadding * GUIScoreboard.kScalingFactor)
 
-    pos = player.SkillIcon:GetPosition().x
-    for _, icon in ipairs(player["IconTable"]) do
+    pos = playerObject.playerGUIItem.SkillIcon:GetPosition().x
+    for _, icon in ipairs(playerObject.playerGUIItem["IconTable"]) do
         if icon:GetIsVisible() then
             local iconSize = icon:GetSize()
             pos = pos - iconSize.x
@@ -1320,186 +1315,149 @@ function GUIScoreboard:UpdateTeam__playersPlaceAndName(player, playerRecord)
         end
     end
 
-    local finalName = player["Name"]:GetText()
-    local finalNameWidth = player["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor
-    local dotsWidth = player["Name"]:GetTextWidth("...") * GUIScoreboard.kScalingFactor
+    local finalName = playerObject.playerGUIItem["Name"]:GetText()
+    local finalNameWidth = playerObject.playerGUIItem["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor
+    local dotsWidth = playerObject.playerGUIItem["Name"]:GetTextWidth("...") * GUIScoreboard.kScalingFactor
+
     -- The minimum truncated length for the name also includes the "..."
     while nameRightPos + finalNameWidth > pos and string.UTF8Length(finalName) > kMinTruncatedNameLength do
         finalName = string.UTF8Sub(finalName, 1, string.UTF8Length(finalName) - 1)
-        finalNameWidth = (player["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor) + dotsWidth
-        player["Name"]:SetText(finalName .. "...")
+        finalNameWidth = (playerObject.playerGUIItem["Name"]:GetTextWidth(finalName) * GUIScoreboard.kScalingFactor) + dotsWidth
+        playerObject.playerGUIItem["Name"]:SetText(finalName .. "...")
     end
 end
 
-function GUIScoreboard:UpdateTeam__skillIcons(player, playerRecord)
-
-    PROFILE("GUIScoreboard:UpdateTeam__skillIcons")
-
-    local clientIndex = playerRecord.ClientIndex
-    local steamId = GetSteamIdForClientIndex(clientIndex)
-    local teamNumber = playerRecord.EntityTeamNumber
-    local playerSkill = playerRecord.Skill or 0
-    local adagradSum = playerRecord.AdagradSum
-    local playerTooltipData = (steamId and steamId > 0 and not isBot) and getPlayerStats(steamId) or nil
-    local isSpectator, isMarine, isAlien = teamNumber == 0, teamNumber == 1, teamNumber == 2
-    local isBot = steamId == 0
-    local isRookie = playerRecord.IsRookie
-    local isLastComm = lastComm[teamNumber] == steamId
-    local playerCommSkillTier, playerCommSkillTierName = GetPlayerSkillTier(playerRecord.playerCommSkill or 0, isRookie, playerRecord.CommAdagradSum or 0, isBot)
-
-    local gInfo = GetGameInfoEntity()
-    local isPreGame = gInfo and gInfo:GetState() <= kGameState.PreGame
+function GUIScoreboard:UpdateTeam_SkillIcons(playerObject)
+    PROFILE("GUIScoreboard:UpdateTeam_SkillIcons")
 
     -- Set player skill icon
-    local skillIconOverrideSettings = CheckForSpecialBadgeRecipient(steamId)
+    local skillIconOverrideSettings = CheckForSpecialBadgeRecipient(playerObject.steamId)
     if skillIconOverrideSettings then
         -- User has a special skill-tier icon tied to their steam Id.
 
         -- Reset the skill icon's texture coordinates to the default normalized coordinates (0, 0), (1, 1).
         -- The shader depends on them being this way.
-        player.SkillIcon:SetTextureCoordinates(0, 0, 1, 1)
+        playerObject.playerGUIItem.SkillIcon:SetTextureCoordinates(0, 0, 1, 1)
 
         -- Change the skill icon's shader to the one that will animate.
-        player.SkillIcon:SetShader(skillIconOverrideSettings.shader)
-        player.SkillIcon:SetTexture(skillIconOverrideSettings.tex)
-        player.SkillIcon:SetFloatParameter("frameCount", skillIconOverrideSettings.frameCount)
+        playerObject.playerGUIItem.SkillIcon:SetShader(skillIconOverrideSettings.shader)
+        playerObject.playerGUIItem.SkillIcon:SetTexture(skillIconOverrideSettings.tex)
+        playerObject.playerGUIItem.SkillIcon:SetFloatParameter("frameCount", skillIconOverrideSettings.frameCount)
 
         -- Change the size so it doesn't touch the weapon name text.
-        player.SkillIcon:SetSize(kPlayerSkillIconSizeOverride * GUIScoreboard.kScalingFactor)
+        playerObject.playerGUIItem.SkillIcon:SetSize(kPlayerSkillIconSizeOverride * GUIScoreboard.kScalingFactor)
 
         -- Change the tooltip of the skill icon.
-        player.SkillIcon.tooltipText = skillIconOverrideSettings.tooltip
+        playerObject.playerGUIItem.SkillIcon.tooltipText = skillIconOverrideSettings.tooltip
     else
         -- User has no special skill-tier icon.
 
         -- Reset the shader and texture back to the default one.
-        player.SkillIcon:SetShader("shaders/GUIBasic.surface_shader")
-        player.SkillIcon:SetTexture(kPlayerSkillIconTexture)
-        player.SkillIcon:SetSize(kPlayerSkillIconSize * GUIScoreboard.kScalingFactor)
+        playerObject.playerGUIItem.SkillIcon:SetShader("shaders/GUIBasic.surface_shader")
+        playerObject.playerGUIItem.SkillIcon:SetTexture(kPlayerSkillIconTexture)
+        playerObject.playerGUIItem.SkillIcon:SetSize(kPlayerSkillIconSize * GUIScoreboard.kScalingFactor)
 
-        local skillTier, tierName, cappedSkill = GetPlayerSkillTier(playerSkill, isRookie, adagradSum, isBot)
-        player.SkillIcon.tooltipText = string.format(Locale.ResolveString("SKILLTIER_TOOLTIP"), Locale.ResolveString(tierName), skillTier)
+        playerObject.playerGUIItem.SkillIcon.tooltipText = string.format(Locale.ResolveString("SKILLTIER_TOOLTIP"), Locale.ResolveString(playerObject.playerSkillTierName), playerObject.playerSkillTier)
 
-        local iconIndex = skillTier + 2
-        player.SkillIcon:SetTexturePixelCoordinates(0, iconIndex * 32, 100, (iconIndex + 1) * 32 - 1)
-
-        --[[if cappedSkill then
-			sumPlayerSkill = sumPlayerSkill + cappedSkill
-			numPlayerSkill = numPlayerSkill + 1
-		end--]]
+        local iconIndex = playerObject.playerSkillTier + 2
+        playerObject.playerGUIItem.SkillIcon:SetTexturePixelCoordinates(0, iconIndex * 32, 100, (iconIndex + 1) * 32 - 1)
     end
 
-    if isBot then
-        player.SkillIcon.tooltipText = "NS2 Bot"
+    if playerObject["isBot"] then
+        playerObject.playerGUIItem.SkillIcon.tooltipText = "NS2 Bot"
     else
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerRecord.playerSkill or 0))
-        if isSpectator or isMarine or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineSkill or 0)
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. string.format("\nSkill: %.0f", (playerObject.playerSkill))
+        if playerObject.isSpectator or playerObject["isMarine"] or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerObject.marineSkill)
         end
-        if isSpectator or isAlien or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienSkill or 0)
+        if playerObject.isSpectator or playerObject["isAlien"] or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerObject.alienSkill)
         end
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
-        if isSpectator or isLastComm or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerCommSkillTierName) .. " (" .. tostring(playerCommSkillTier) .. ")"
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\n"
+        if playerObject.isSpectator or playerObject.isLastComm or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerObject.comSkillTierName) .. " (" .. tostring(playerObject.comSkillTier) .. ")"
         end
-        if isSpectator or isLastComm or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerRecord.playerCommSkill or 0))
+        if playerObject.isSpectator or playerObject.isLastComm or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerObject.playerCommSkill))
         end
-        if isSpectator or (isLastComm and isMarine) or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerRecord.marineCommSkill or 0)
+        if playerObject.isSpectator or (playerObject.isLastComm and playerObject["isMarine"]) or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nMarine: " .. tostring(playerObject.marineCommSkill)
         end
-        if isSpectator or (isLastComm and isAlien) or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerRecord.alienCommSkill or 0)
+        if playerObject.isSpectator or (playerObject.isLastComm and playerObject["isAlien"]) or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nAlien: " .. tostring(playerObject.alienCommSkill)
         end
-        if isSpectator or isLastComm or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\n"
+        if playerObject.isSpectator or playerObject.isLastComm or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\n"
         end
     end
 
-    if not isBot and not playerTooltipData then
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nRequesting NS2Panel data..."
-    elseif not isBot and playerTooltipData and playerTooltipData.fetched and playerTooltipData.fetched == 0 then
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nNo NS2Panel data!"
-    elseif not isBot and playerTooltipData and playerTooltipData.marine_skill then
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nKDR:"
-        if isSpectator or isMarine or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " M " .. tostring(playerTooltipData.marine_kdr or 0)
+    if not playerObject["isBot"] and not playerObject["playerTooltipData"] then
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nRequesting NS2Panel data..."
+    elseif not playerObject["isBot"] and playerObject["playerTooltipData"] and playerObject["playerTooltipData"].fetched and playerObject["playerTooltipData"].fetched == 0 then
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nNo NS2Panel data!"
+    elseif not playerObject["isBot"] and playerObject["playerTooltipData"] and playerObject["playerTooltipData"].marine_skill then
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nKDR:"
+        if playerObject["isSpectator"] or playerObject["isMarine"] or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. " M " .. tostring(playerObject["playerTooltipData"].marine_kdr)
         end
-        if isSpectator or isAlien or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " A " .. tostring(playerTooltipData.alien_kdr or 0)
+        if playerObject["isSpectator"] or playerObject["isAlien"] or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. " A " .. tostring(playerObject["playerTooltipData"].alien_kdr)
         end
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nAccuracy:"
-        if isSpectator or isMarine or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " M " .. tostring(round(playerTooltipData.marine_accuracy or 0, 0))
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nAccuracy:"
+        if playerObject["isSpectator"] or playerObject["isMarine"] or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. " M " .. tostring(round(playerObject["playerTooltipData"].marine_accuracy, 0))
         end
-        if isSpectator or isAlien or isPreGame then
-            player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. " A " .. tostring(round(playerTooltipData.alien_accuracy or 0, 0))
+        if playerObject["isSpectator"] or playerObject["isAlien"] or isPreGame then
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. " A " .. tostring(round(playerObject["playerTooltipData"].alien_accuracy, 0))
         end
-        player.SkillIcon.tooltipText = player.SkillIcon.tooltipText .. "\nProvided by NS2Panel"
-        playerTooltipData.toolTip = player.SkillIcon.tooltipText
+        playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nProvided by NS2Panel"
+        playerObject["playerTooltipData"].toolTip = playerObject.playerGUIItem.SkillIcon.tooltipText
     end
 end
 
-function GUIScoreboard:UpdateTeam__statsValues(player, playerRecord)
+function GUIScoreboard:UpdateTeam_StatsValues(playerObject, teamObject)
+    PROFILE("GUIScoreboard:UpdateTeam_StatsValues")
 
-    PROFILE("GUIScoreboard:UpdateTeam__statsValues")
-
-    local clientIndex = playerRecord.ClientIndex
-    local steamId = GetSteamIdForClientIndex(clientIndex)
-    local teamNumber = playerRecord.EntityTeamNumber
-    local isPlayingTeam = teamNumber ~= kTeamReadyRoom
-    local isLastComm = lastComm[teamNumber] == steamId
-    local isBot = steamId == 0
-    local isVisibleTeam = GetIsVisibleTeam(teamNumber)
-    local isCommander = playerRecord.IsCommander and isVisibleTeam == true
-
-    local score = playerRecord.Score
-    local kills = playerRecord.Kills
-    local assists = playerRecord.Assists
-    local deaths = playerRecord.Deaths
-    local resourcesStr = ConditionalValue(isVisibleTeam, tostring(math.floor(playerRecord.Resources * 10) / 10), "-")
-
-    local ping = playerRecord.Ping
-    local pingStr = tostring(ping)
+    local resourcesStr = ConditionalValue(teamObject["isVisibleTeam"], tostring(math.floor(playerObject["resources"] * 10) / 10), "-")
 
     local deadString = Locale.ResolveString("STATUS_DEAD")
-    local isDead = isVisibleTeam and playerRecord.Status == deadString
+    local isDead = teamObject["isVisibleTeam"] and playerObject["playerStatus"] == deadString
 
-    if (isCommander or (isLastComm and not isBot)) and isPlayingTeam then
+	local score = tostring(playerObject["score"])
+    if (playerObject["isCommander"] or (playerObject["isLastComm"] and not playerObject["isBot"])) and teamObject["isPlayingTeam"] then
         score = "*"
     end
 
-    if isPlayingTeam then
-        player["Score"]:SetText(tostring(score))
-        player["Kills"]:SetText(tostring(kills))
-        player["Assists"]:SetText(tostring(assists))
-        player["Deaths"]:SetText(tostring(deaths))
-        player["Resources"]:SetText(resourcesStr)
+    if teamObject["isPlayingTeam"] then
+        playerObject.playerGUIItem["Score"]:SetText(score)
+        playerObject.playerGUIItem["Kills"]:SetText(tostring(playerObject["kills"]))
+        playerObject.playerGUIItem["Assists"]:SetText(tostring(playerObject["assists"]))
+        playerObject.playerGUIItem["Deaths"]:SetText(tostring(playerObject["deaths"]))
+        playerObject.playerGUIItem["Resources"]:SetText(resourcesStr)
     end
     -- player["Status"]:SetText(playerStatus)
-    player["Ping"]:SetText(pingStr)
+    playerObject.playerGUIItem["Ping"]:SetText(tostring(playerObject["ping"]))
 
-    player["Score"]:SetIsVisible(isPlayingTeam)
-    player["Kills"]:SetIsVisible(isPlayingTeam)
-    player["Assists"]:SetIsVisible(isPlayingTeam)
-    player["Deaths"]:SetIsVisible(isPlayingTeam)
-    player["Resources"]:SetIsVisible(isPlayingTeam)
+    playerObject.playerGUIItem["Score"]:SetIsVisible(teamObject["isPlayingTeam"])
+    playerObject.playerGUIItem["Kills"]:SetIsVisible(teamObject["isPlayingTeam"])
+    playerObject.playerGUIItem["Assists"]:SetIsVisible(teamObject["isPlayingTeam"])
+    playerObject.playerGUIItem["Deaths"]:SetIsVisible(teamObject["isPlayingTeam"])
+    playerObject.playerGUIItem["Resources"]:SetIsVisible(teamObject["isPlayingTeam"])
 
     local white = GUIScoreboard.kWhiteColor
     local baseColor, nameColor, statusColor = white, white, white
 
-    if isDead and isVisibleTeam then
+    if isDead and teamObject["isVisibleTeam"] then
         nameColor, statusColor = kDeadColor, kDeadColor
     end
 
-    player["Score"]:SetColor(baseColor)
-    player["Kills"]:SetColor(baseColor)
-    player["Assists"]:SetColor(baseColor)
-    player["Deaths"]:SetColor(baseColor)
-    player["Status"]:SetColor(statusColor)
+    playerObject.playerGUIItem["Score"]:SetColor(baseColor)
+    playerObject.playerGUIItem["Kills"]:SetColor(baseColor)
+    playerObject.playerGUIItem["Assists"]:SetColor(baseColor)
+    playerObject.playerGUIItem["Deaths"]:SetColor(baseColor)
+    playerObject.playerGUIItem["Status"]:SetColor(statusColor)
 
-    player["Name"]:SetColor(nameColor)
+    playerObject.playerGUIItem["Name"]:SetColor(nameColor)
 
     -- resource color
     if resourcesStr then
@@ -1508,65 +1466,57 @@ function GUIScoreboard:UpdateTeam__statsValues(player, playerRecord)
             resourcesNumber = 0
         end
         if resourcesNumber < GUIScoreboard.kHighPresThreshold then
-            player["Resources"]:SetColor(baseColor)
+            playerObject.playerGUIItem["Resources"]:SetColor(baseColor)
         elseif resourcesNumber >= GUIScoreboard.kMaxPresThreshold then
-            player["Resources"]:SetColor(GUIScoreboard.kMaxPresColor)
+            playerObject.playerGUIItem["Resources"]:SetColor(GUIScoreboard.kMaxPresColor)
         elseif resourcesNumber >= GUIScoreboard.kVeryHighPresThreshold then
-            player["Resources"]:SetColor(GUIScoreboard.kVeryHighPresColor)
+            playerObject.playerGUIItem["Resources"]:SetColor(GUIScoreboard.kVeryHighPresColor)
         else
-            player["Resources"]:SetColor(GUIScoreboard.kHighPresColor)
+            playerObject.playerGUIItem["Resources"]:SetColor(GUIScoreboard.kHighPresColor)
         end
     else
-        player["Resources"]:SetColor(baseColor)
+        playerObject.playerGUIItem["Resources"]:SetColor(baseColor)
     end
 
-    if ping < GUIScoreboard.kLowPingThreshold then
-        player["Ping"]:SetColor(GUIScoreboard.kLowPingColor)
-    elseif ping < GUIScoreboard.kMedPingThreshold then
-        player["Ping"]:SetColor(GUIScoreboard.kMedPingColor)
-    elseif ping < GUIScoreboard.kHighPingThreshold then
-        player["Ping"]:SetColor(GUIScoreboard.kHighPingColor)
+    if playerObject["ping"] < GUIScoreboard.kLowPingThreshold then
+        playerObject.playerGUIItem["Ping"]:SetColor(GUIScoreboard.kLowPingColor)
+    elseif playerObject["ping"] < GUIScoreboard.kMedPingThreshold then
+        playerObject.playerGUIItem["Ping"]:SetColor(GUIScoreboard.kMedPingColor)
+    elseif playerObject["ping"] < GUIScoreboard.kHighPingThreshold then
+        playerObject.playerGUIItem["Ping"]:SetColor(GUIScoreboard.kHighPingColor)
     else
-        player["Ping"]:SetColor(GUIScoreboard.kInsanePingColor)
+        playerObject.playerGUIItem["Ping"]:SetColor(GUIScoreboard.kInsanePingColor)
     end
 
 end
 
-function GUIScoreboard:UpdateTeam__backgroundColor(player, playerRecord, teamColor)
-    PROFILE("GUIScoreboard:UpdateTeam__backgroundColor")
-
-    local clientIndex = playerRecord.ClientIndex
-    local steamId = GetSteamIdForClientIndex(clientIndex)
-    local teamNumber = playerRecord.EntityTeamNumber
-    local isLastComm = lastComm[teamNumber] == steamId
-    local isVisibleTeam = GetIsVisibleTeam(teamNumber)
-    local isCommander = playerRecord.IsCommander and isVisibleTeam == true
-    local isBot = steamId == 0
+function GUIScoreboard:UpdateTeam_BackgroundColor(playerObject, teamObject)
+    PROFILE("GUIScoreboard:UpdateTeam_BackgroundColor")
 
     local color = Color(0.5, 0.5, 0.5, 1)
-    if isCommander or (isLastComm and not isBot) then
+    if playerObject["isCommander"] or (playerObject["isLastComm"] and not playerObject["isBot"]) then
         color = GUIScoreboard.kCommanderFontColor * 0.8
     else
-        color = teamColor * 0.8
+        color = teamObject["teamColor"] * 0.8
     end
 
     if not self.hoverMenu.background:GetIsVisible() and not MainMenu_GetIsOpened() then
         if MouseTracker_GetIsVisible() then
             local mouseX, mouseY = Client.GetCursorPosScreen()
-            if GUIItemContainsPoint(player["Background"], mouseX, mouseY) then
+            if GUIItemContainsPoint(playerObject.playerGUIItem["Background"], mouseX, mouseY) then
                 local canHighlight = true
                 local hoverBadge = false
-                for _, icon in ipairs(player["IconTable"]) do
+                for _, icon in ipairs(playerObject.playerGUIItem["IconTable"]) do
                     if icon:GetIsVisible() and GUIItemContainsPoint(icon, mouseX, mouseY) and not icon.allowHighlight then
                         canHighlight = false
                         break
                     end
                 end
 
-                for i = 1, #player.BadgeItems do
-                    local badgeItem = player.BadgeItems[i]
+                for i = 1, #playerObject.playerGUIItem["BadgeItems"] do
+                    local badgeItem = playerObject.playerGUIItem["BadgeItems"][i]
                     if GUIItemContainsPoint(badgeItem, mouseX, mouseY) and badgeItem:GetIsVisible() then
-                        local _, badgeNames = Badges_GetBadgeTextures(clientIndex, "scoreboard")
+                        local _, badgeNames = Badges_GetBadgeTextures(playerObject["clientIndex"], "scoreboard")
                         local badge = ToString(badgeNames[i])
                         self.badgeNameTooltip:SetText(GetBadgeFormalName(badge))
                         hoverBadge = true
@@ -1574,15 +1524,14 @@ function GUIScoreboard:UpdateTeam__backgroundColor(player, playerRecord, teamCol
                     end
                 end
 
-                local skillIcon = player.SkillIcon
-                if skillIcon:GetIsVisible() and GUIItemContainsPoint(skillIcon, mouseX, mouseY) then
-                    self.badgeNameTooltip:SetText(skillIcon.tooltipText)
+                if playerObject.playerGUIItem["SkillIcon"]:GetIsVisible() and GUIItemContainsPoint(playerObject.playerGUIItem["SkillIcon"], mouseX, mouseY) then
+                    self.badgeNameTooltip:SetText(playerObject.playerGUIItem["SkillIcon"].tooltipText)
                     hoverBadge = true
                 end
 
                 if canHighlight then
-                    self.hoverPlayerClientIndex = clientIndex
-                    player["Background"]:SetColor(color)
+                    self.hoverPlayerClientIndex = playerObject["clientIndex"]
+                    playerObject.playerGUIItem["Background"]:SetColor(color)
                 else
                     self.hoverPlayerClientIndex = 0
                 end
@@ -1609,13 +1558,12 @@ function GUIScoreboard:UpdateTeam__backgroundColor(player, playerRecord, teamCol
                 end
             end
         end
-    elseif steamId == GetSteamIdForClientIndex(self.hoverPlayerClientIndex) then
-        player["Background"]:SetColor(color)
+    elseif playerObject["steamId"] == GetSteamIdForClientIndex(self.hoverPlayerClientIndex) then
+        playerObject.playerGUIItem["Background"]:SetColor(color)
     end
 end
 
 function GUIScoreboard:UpdateTeam(updateTeam)
-
     PROFILE("GUIScoreboard:UpdateTeam")
 
     local teamObject = {}
@@ -1634,7 +1582,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     -- Determines if the local player can see secret information
     -- for this team.
     teamObject.isVisibleTeam = GetIsVisibleTeam(teamObject.teamNumber)
-    teamObject.isSpectator, teamObject.isMarine, teamObject.isAlien = teamObject.teamNumber == 0, teamObject.teamNumber == 1, teamObject.teamNumber == 2
+    teamObject.isSpectator, teamObject.isMarine, teamObject.isAlien = teamObject.teamNumber == kNeutralTeamType, teamObject.teamNumber == kMarineTeamType, teamObject.teamNumber == kAlienTeamType
 
     -- How many items per player.
     teamObject.numPlayers = table.icount(teamObject.teamScores)
@@ -1695,47 +1643,53 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     local numBots = 0
 
     -- Reset lastcomm in case of pregame
-    local gInfo = GetGameInfoEntity()
-    local isPreGame = false
-    if gInfo and gInfo:GetState() <= kGameState.PreGame then
-        isPreGame = true
+    if isPreGame then
         lastComm[teamObject.teamNumber] = nil
     end
 
     local isSpectating = false
-    local commRage = lastComm[teamObject.teamNumber] ~= nil
+    teamObject.commRage = lastComm[teamObject.teamNumber] ~= nil
     for index, player in ipairs(teamObject.playerList) do
 		local playerRecord = teamObject.teamScores[index]
         local playerObject = {}
 		playerObject.playerGUIItem = player
-        playerObject.playerRecord = teamObject.teamScores[index]
-        playerObject.playerName = playerObject.playerRecord.Name or "Unknown"
-        playerObject.clientIndex = playerObject.playerRecord.ClientIndex
-		playerObject.teamNumber = playerObject.playerRecord.EntityTeamNumber
+
+        playerObject.playerName = playerRecord["Name"] or "Unknown"
+        playerObject.clientIndex = playerRecord["ClientIndex"]
+		playerObject.teamNumber = playerRecord["EntityTeamNumber"]
         playerObject.steamId = GetSteamIdForClientIndex(playerObject.clientIndex)
-		playerObject.playerStatus = teamObject.isVisibleTeam and playerObject.playerRecord.Status or "-"
-        playerObject.score = playerObject.playerRecord.Score or 0
-        playerObject.kills = playerObject.playerRecord.Kills or 0
-        playerObject.assists = playerObject.playerRecord.Assists or 0
-        playerObject.deaths = playerObject.playerRecord.Deaths or 0
-        playerObject.isCommander = playerObject.playerRecord.IsCommander and teamObject.isVisibleTeam == true
+		playerObject.playerStatus = teamObject.isVisibleTeam and playerRecord["Status"] or "-"
+        playerObject.score = playerRecord["Score"] or 0
+        playerObject.kills = playerRecord["Kills"] or 0
+        playerObject.assists = playerRecord["Assists"] or 0
+        playerObject.deaths = playerRecord["Deaths"] or 0
+        playerObject.isCommander = playerRecord["IsCommander"] -- and teamObject.isVisibleTeam == true
+		playerObject.isSpectator, playerObject.isMarine, playerObject.isAlien = playerObject["teamNumber"] == kNeutralTeamType, playerObject["teamNumber"] == kMarineTeamType, playerObject["teamNumber"] == kAlienTeamType
+		playerObject.resources = playerRecord["Resources"] or 0
+		playerObject.ping = playerRecord["Ping"] or 0
 
         playerObject.currentPosition = Vector(player["Background"]:GetPosition())
-        playerObject.isSteamFriend = playerObject.playerRecord.IsSteamFriend
-        playerObject.playerSkill = playerObject.playerRecord.Skill or 0
-        playerObject.adagradSum = playerObject.playerRecord.AdagradSum or 0
-		playerObject.playerCommSkill = playerObject.playerRecord.playerCommSkill or 0
-		playerObject.CommAdagradSum = playerObject.playerRecord.CommAdagradSum or 0
+        playerObject.isSteamFriend = playerRecord["IsSteamFriend"]
+        playerObject.playerSkill = playerRecord["Skill"] or 0
+        playerObject.adagradSum = playerRecord["AdagradSum"] or 0
+		playerObject.marineSkill = playerRecord["marineSkill"] or 0
+		playerObject.alienSkill = playerRecord["alienSkill"] or 0
+		playerObject.playerCommSkill = playerRecord["playerCommSkill"] or 0
+		playerObject.marineCommSkill = playerRecord["marineCommSkill"] or 0
+		playerObject.alienCommSkill = playerRecord["alienCommSkill"] or 0
+		playerObject.CommAdagradSum = playerRecord["CommAdagradSum"] or 0
         playerObject.commanderColor = GUIScoreboard.kCommanderFontColor
-        playerObject.currentTech = GetTechIdsFromBitMask(playerObject.playerRecord.Tech)
-        if playerObject.steamId == localPlayerSteamID and playerObject.playerRecord.IsSpectator then
+        playerObject.currentTech = GetTechIdsFromBitMask(playerRecord["Tech"])
+        if playerObject.steamId == localPlayerSteamID and playerRecord["IsSpectator"] then
             isSpectating = true
         end
 
         playerObject.isBot = playerObject.steamId == 0
-        playerObject.isRookie = playerObject.playerRecord.IsRookie
+        playerObject.isRookie = playerRecord["IsRookie"]
         numRookies = numRookies + (playerObject.isRookie and 1 or 0)
         numBots = numBots + (playerObject.isBot and 1 or 0)
+
+		playerObject.playerTooltipData = (playerObject.steamId and playerObject.steamId > 0 and not playerObject.isBot) and getPlayerStats(playerObject.steamId) or nil
 
         -- Skills
         playerObject.playerSkillTier, playerObject.playerSkillTierName, playerObject.playerSkillCapped = GetPlayerSkillTier(playerObject.playerSkill, playerObject.isRookie, playerObject.adagradSum, playerObject.isBot)
@@ -1752,29 +1706,30 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         end
         playerObject.isLastComm = lastComm[teamObject.teamNumber] == playerObject.steamId
 
+		-- Process the player GUI items
         self:UpdateTeam_CommanderName(playerObject, teamObject)
-        self:UpdateTeam__upgradesIcons(player, playerRecord)
+        self:UpdateTeam_UpgradesIcons(playerObject, teamObject)
 
         playerObject.currentPosition.y = currentY
-        player["Background"]:SetPosition(playerObject.currentPosition)
-        player["Background"]:SetColor(ConditionalValue(playerObject.isCommander, playerObject.commanderColor, teamObject.teamColor))
+        playerObject.playerGUIItem["Background"]:SetPosition(playerObject.currentPosition)
+        playerObject.playerGUIItem["Background"]:SetColor(ConditionalValue(playerObject.isCommander, playerObject.commanderColor, teamObject.teamColor))
 
-        player["Number"]:SetText(index .. ".")
-        player["Name"]:SetText(playerObject.playerName)
-        player["ClientIndex"] = playerObject.clientIndex
+        playerObject.playerGUIItem["Number"]:SetText(index .. ".")
+        playerObject.playerGUIItem["Name"]:SetText(playerObject.playerName)
+        playerObject.playerGUIItem["ClientIndex"] = playerObject.clientIndex
 
         self:UpdateTeam_HighlightCurrentPlayer(playerObject, teamObject)
 
-        self:UpdateTeam__skillIcons(playerObject.playerGUIItem, playerRecord)
-        self:UpdateTeam__statsValues(playerObject.playerGUIItem, playerRecord)
-        self:UpdateTeam__playersPlaceAndName(playerObject.playerGUIItem, playerRecord)
+        self:UpdateTeam_SkillIcons(playerObject)
+        self:UpdateTeam_StatsValues(playerObject, teamObject)
+        self:UpdateTeam_PlayersPlaceAndName(playerObject)
 
         -- Icons on the right side of the player name
-        player["SteamFriend"]:SetIsVisible(playerObject.isSteamFriend)
-        player["Voice"]:SetIsVisible(ChatUI_GetClientMuted(playerObject.clientIndex))
-        player["Text"]:SetIsVisible(ChatUI_GetSteamIdTextMuted(playerObject.steamId))
+        playerObject.playerGUIItem["SteamFriend"]:SetIsVisible(playerObject.isSteamFriend)
+        playerObject.playerGUIItem["Voice"]:SetIsVisible(ChatUI_GetClientMuted(playerObject.clientIndex))
+        playerObject.playerGUIItem["Text"]:SetIsVisible(ChatUI_GetSteamIdTextMuted(playerObject.steamId))
 
-        self:UpdateTeam__backgroundColor(playerObject.playerGUIItem, playerRecord, teamObject.teamColor)
+        self:UpdateTeam_BackgroundColor(playerObject, teamObject)
 
         currentY = currentY + (GUIScoreboard.kPlayerItemHeight + GUIScoreboard.kPlayerSpacing) * GUIScoreboard.kScalingFactor
     end
@@ -1785,7 +1740,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     end
 
     -- Commander Range handle
-    if commRage then
+    if teamObject.commRage then
         lastComm[teamObject.teamNumber] = nil
     end
 
@@ -2556,9 +2511,9 @@ function GUIScoreboard:SendKeyEvent(key, down)
 
             if isCommander then
                 teamColorBg = GUIScoreboard.kCommanderFontColor
-            elseif teamNumber == 1 then
+            elseif teamNumber == kMarineTeamType then
                 teamColorBg = GUIScoreboard.kBlueColor
-            elseif teamNumber == 2 then
+            elseif teamNumber == kAlienTeamType then
                 teamColorBg = GUIScoreboard.kRedColor
             else
                 teamColorBg = GUIScoreboard.kSpectatorColor
