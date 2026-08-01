@@ -52,7 +52,7 @@ local function DQB_Check_Keybinds(self, key, down)
                     end
                 end
             end -- if not down
-            
+
             break
         end -- if key matches itemButton binding
     end -- for each itemButton

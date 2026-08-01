@@ -96,7 +96,7 @@ if (nil ~= BindingsUI_GetBindingsData) then
             {kDQBLerkKey,         "3"},
             {kDQBFadeKey,         "4"},
             {kDQBOnosKey,         "5"},
-            
+
 			{kDQBRegenerationKey, "NumPad1"},
             {kDQBCarapaceKey,     "NumPad2"},
 			{kDQBVampirismKey,    "NumPad3"},
@@ -125,7 +125,7 @@ if (nil ~= BindingsUI_GetBindingsData) then
         {
             kDQBStartMarker,     "title", "Buy Menu Hotkeys",          "Key Binding for Buy Menu Hotkeys Mod",
             kDQBEvolveKey,       "input", "Buy Menu Evolve",           "NumPadEnter",
-            kDQBGorgeKey,        "input", "Select Gorge",              "1",            
+            kDQBGorgeKey,        "input", "Select Gorge",              "1",
             kDQBSkulkKey,        "input", "Select Skulk",              "2",
             kDQBLerkKey,         "input", "Select Lerk",               "3",
             kDQBFadeKey,         "input", "Select Fade",               "4",

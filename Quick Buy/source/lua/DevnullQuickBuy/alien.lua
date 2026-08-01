@@ -563,7 +563,7 @@ local function DQB_Create_Button_Label(TechId)
         Print("DQB: TechId %d [%s] unrecognized or unbound", TechId, Locale.ResolveString(LookupTechData(TechId, kTechDataDisplayName, "")))
     end -- TechId...
 
-    if string.match(hotkey_text:GetText(), "Num Pad") then
+    if hotkey_text and string.match(hotkey_text:GetText(), "Num Pad") then
         hotkey_text:SetText(hotkey_text:GetText():gsub("Num Pad", "Num"))
         hotkey_graphic:SetSize(Vector(hotkey_text:GetTextWidth(hotkey_text:GetText()) + 22, 32, 0))
     end
@@ -639,7 +639,7 @@ local function DQB_Update_Button_Labels(self)
             if not alienButton.dqb_alien_hotkey_graphic then
                 -- create a new button
                 alienButton.dqb_alien_hotkey_graphic, alienButton.dqb_alien_hotkey_text = DQB_Create_Button_Label(techId)
-                if string.match(alienButton.dqb_alien_hotkey_text:GetText(), "Num Pad") then
+                if alienButton.dqb_alien_hotkey_text and string.match(alienButton.dqb_alien_hotkey_text:GetText(), "Num Pad") then
                     alienButton.dqb_alien_hotkey_text:SetText(alienButton.dqb_alien_hotkey_text:GetText():gsub("Num Pad", "Num"))
                     alienButton.dqb_alien_hotkey_graphic:SetSize(Vector(alienButton.dqb_alien_hotkey_text:GetTextWidth(alienButton.dqb_alien_hotkey_text:GetText()) + 22, 32, 0))
                 end
@@ -647,7 +647,7 @@ local function DQB_Update_Button_Labels(self)
                 if not alienButton.dqb_alien_hotkey_graphic then
                     -- don't process this button in the future
                     alienButton.dqb_alien_hotkey_graphic = 1
-                else
+                elseif alienButton.dqb_alien_hotkey_text then
                     alienButton.dqb_alien_hotkey_text:SetColor(1, 1, 0.8)
                     -- apply generic settings to the button
                     DQB_Set_Label_Position(alienButton.dqb_alien_hotkey_graphic, techId)

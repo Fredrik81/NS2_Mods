@@ -1,5 +1,5 @@
 modEntry = {
 	Client = "lua/DevnullQuickBuy/Client.lua",
-	FileHooks = "lua/DevnullQuickBuy/ClientHooks.lua",
+	FileHooks = "lua/DevnullQuickBuy/Filehooks.lua",
 	Priority = 5
 }
