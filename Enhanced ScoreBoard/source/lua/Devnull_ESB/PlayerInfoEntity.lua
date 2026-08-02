@@ -103,11 +103,16 @@ end
 EnsureTechUpgradeTablesCurrent()
 local oldPlayerInfoEntityUpdateScore = PlayerInfoEntity.UpdateScore
 
-function GetTechIdsFromBitMask(techTable)
+function GetTechIdsFromBitMask(techTable, sort)
+
+    PROFILE("GetTechIdsFromBitMask")
+
     EnsureTechUpgradeTablesCurrent()
 
-    local techIds = {}
-
+    local techIds = { }
+    if sort == nil then
+        sort = true
+    end
     if techTable and techTable > 0 then
         for _, techId in ipairs(techUpgradesTable) do
             local bitmask = techUpgradesBitmask[techId]
@@ -117,10 +122,10 @@ function GetTechIdsFromBitMask(techTable)
         end
     end
 
-    -- Sort the table by bitmask value so it keeps the order established in the original table
-    table.sort(techIds, function(a, b)
-        return techUpgradesBitmask[a] < techUpgradesBitmask[b]
-    end)
+    if sort then
+        --Sort the table by bitmask value so it keeps the order established in the original table
+        table.sort(techIds, function(a, b) return techUpgradesBitmask[a] < techUpgradesBitmask[b] end)
+    end
 
     return techIds
 end
