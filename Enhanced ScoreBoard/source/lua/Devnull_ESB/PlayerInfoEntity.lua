@@ -109,10 +109,8 @@ function GetTechIdsFromBitMask(techTable, sort)
 
     EnsureTechUpgradeTablesCurrent()
 
-    local techIds = { }
-    if sort == nil then
-        sort = true
-    end
+    local techIds = {}
+    sort = sort ~= false
     if techTable and techTable > 0 then
         for _, techId in ipairs(techUpgradesTable) do
             local bitmask = techUpgradesBitmask[techId]
