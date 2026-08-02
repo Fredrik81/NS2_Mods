@@ -1584,11 +1584,8 @@ function GUIScoreboard:UpdateTeam_BackgroundColor(playerObject, teamObject)
 
                 if canHighlight then
                     self.hoverPlayerClientIndex = playerObject["clientIndex"]
-                    print("Hovering over player: " .. playerObject["playerName"] .. " (Client Index: " .. self.hoverPlayerClientIndex .. ")")
-                    print('playerObject[\"clientIndex\"]: ' .. tostring(playerObject["clientIndex"]))
                     playerObject.playerGUIItem["Background"]:SetColor(color)
                 else
-                    print("Not hovering over player: " .. playerObject["playerName"] .. " (Client Index: " .. self.hoverPlayerClientIndex .. ")")
                     self.hoverPlayerClientIndex = 0
                 end
 
@@ -2544,15 +2541,11 @@ function GUIScoreboard:SendKeyEvent(key, down)
     end
 
     if key == InputKey.MouseButton0 and self.mousePressed["LMB"]["Down"] ~= down and down and not MainMenu_GetIsOpened() then
-        print("MouseButton0 clicked, calling HandlePlayerTextClicked")
         HandlePlayerTextClicked(self)
 
         local steamId = GetSteamIdForClientIndex(self.hoverPlayerClientIndex) or 0
-        print("steamId: " .. steamId .. ", hoverPlayerClientIndex: " .. self.hoverPlayerClientIndex .. ", devMode: " .. tostring(Shared.GetDevMode()))
-        print("================================")
         if self.hoverMenu.background:GetIsVisible() then
             -- Display the menu for bots if dev mode is on (steamId is 0 but they have a proper clientIndex)
-            print("Hover menu is visible, checking conditions for opening profile")
             return false
         elseif steamId ~= 0 or self.hoverPlayerClientIndex ~= 0 and Shared.GetDevMode() then
             local isTextMuted = ChatUI_GetSteamIdTextMuted(steamId)
