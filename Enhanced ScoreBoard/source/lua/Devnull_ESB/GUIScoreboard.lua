@@ -875,7 +875,6 @@ function GUIScoreboard:Update_TeamsInfo() -- ToDo: Why does this function get al
     local fetchTable = {}
 
     for index, team in ipairs(self.teams) do
-
         -- Update coms info
         local scores = team["GetScores"]()
         for _, player in pairs(scores) do
@@ -1138,6 +1137,8 @@ function GUIScoreboard:Update(deltaTime)
     local gInfo = GetGameInfoEntity()
     isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
 
+    self:Update_SetMainVisibles()
+
     local fetchTable, teamGUISize = self:Update_TeamsInfo()
     local contentXSize, contentYSize = self:Update_toNewSizes(teamGUISize)
 
@@ -1148,8 +1149,6 @@ function GUIScoreboard:Update(deltaTime)
     if vis then
         self:Update_GUIElements(deltaTime, contentXSize, contentYSize)
     end
-
-    self:Update_SetMainVisibles()
 end
 
 local function SetPlayerItemBadges(item, badgeTextures)
@@ -1585,8 +1584,11 @@ function GUIScoreboard:UpdateTeam_BackgroundColor(playerObject, teamObject)
 
                 if canHighlight then
                     self.hoverPlayerClientIndex = playerObject["clientIndex"]
+                    print("Hovering over player: " .. playerObject["playerName"] .. " (Client Index: " .. self.hoverPlayerClientIndex .. ")")
+                    print('playerObject[\"clientIndex\"]: ' .. tostring(playerObject["clientIndex"]))
                     playerObject.playerGUIItem["Background"]:SetColor(color)
                 else
+                    print("Not hovering over player: " .. playerObject["playerName"] .. " (Client Index: " .. self.hoverPlayerClientIndex .. ")")
                     self.hoverPlayerClientIndex = 0
                 end
 
@@ -2520,6 +2522,7 @@ end
 
 function GUIScoreboard:SendKeyEvent(key, down)
     PROFILE("GUIScoreboard:SendKeyEvent")
+
     if ChatUI_EnteringChatMessage() then
         return false
     end
@@ -2541,11 +2544,15 @@ function GUIScoreboard:SendKeyEvent(key, down)
     end
 
     if key == InputKey.MouseButton0 and self.mousePressed["LMB"]["Down"] ~= down and down and not MainMenu_GetIsOpened() then
+        print("MouseButton0 clicked, calling HandlePlayerTextClicked")
         HandlePlayerTextClicked(self)
 
         local steamId = GetSteamIdForClientIndex(self.hoverPlayerClientIndex) or 0
+        print("steamId: " .. steamId .. ", hoverPlayerClientIndex: " .. self.hoverPlayerClientIndex .. ", devMode: " .. tostring(Shared.GetDevMode()))
+        print("================================")
         if self.hoverMenu.background:GetIsVisible() then
             -- Display the menu for bots if dev mode is on (steamId is 0 but they have a proper clientIndex)
+            print("Hover menu is visible, checking conditions for opening profile")
             return false
         elseif steamId ~= 0 or self.hoverPlayerClientIndex ~= 0 and Shared.GetDevMode() then
             local isTextMuted = ChatUI_GetSteamIdTextMuted(steamId)

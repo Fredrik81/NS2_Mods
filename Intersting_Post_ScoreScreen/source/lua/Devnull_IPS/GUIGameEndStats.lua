@@ -76,14 +76,16 @@ local function humanNumber(number)
             number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
             number = number / 100
             number = tostring(number) .. "m"
-        elseif number > 1000 then
+        elseif number >= 1000 then
             number = number / 100
             number = number % 1 >= 0.5 and math.ceil(number) or math.floor(number)
             number = number / 10
             number = tostring(number) .. "k"
+        else
+            number = round(number, 1)
         end
 
-        return tostring(number)
+        return number
     else
         return "NaN"
     end
@@ -4103,21 +4105,21 @@ function GUIGameEndStats:ProcessStats()
     -- Don't even bother displaying this, it looks odd
     if numPlayers1 > 1 then
         table.insert(self.team1UI.playerRows,
-            CreateScoreboardRow(self.team1UI.tableBackground, kHeaderRowColor, kMarineHeaderRowTextColor, "Total", printNum(totalKills1), printNum(totalAssists1), printNum(totalDeaths1), " ", round(team1Score, 0), humanNumber(totalPdmg1),
-                humanNumber(totalSdmg1), minutesToStringTime(totalTimeBuilding1)))
+            CreateScoreboardRow(self.team1UI.tableBackground, kHeaderRowColor, kMarineHeaderRowTextColor, "Total", printNum(totalKills1), printNum(totalAssists1), printNum(totalDeaths1), " ", round(team1Score, 0), humanNumber(roundNumber(totalPdmg1, 0)),
+                humanNumber(roundNumber(totalSdmg1, 0)), minutesToStringTime(totalTimeBuilding1)))
         table.insert(self.team1UI.playerRows,
             CreateScoreboardRow(self.team1UI.tableBackground, kAverageRowColor, kAverageRowTextColor, "Average", round(totalKills1 / numPlayers1, 0), round(totalAssists1 / numPlayers1, 0), round(totalDeaths1 / numPlayers1, 0),
                 avgAccuracy1Onos == -1 and string.format("%s%%", round(avgAccuracy1, 0)) or string.format("%s%% (%s%%)", round(avgAccuracy1, 0), round(avgAccuracy1Onos, 0)), round(team1Score / numPlayers1, 0),
-                humanNumber(totalPdmg1 / numPlayers1), humanNumber(totalSdmg1 / numPlayers1), minutesToStringTime(totalTimeBuilding1 / numPlayers1), minutesToStringTime(totalMapTime1 / numPlayers1),
+                humanNumber(roundNumber(totalPdmg1 / numPlayers1, 0)), humanNumber(roundNumber(totalSdmg1 / numPlayers1, 0)), minutesToStringTime(totalTimeBuilding1 / numPlayers1), minutesToStringTime(totalMapTime1 / numPlayers1),
                 minutesToStringTime(totalTimePlaying1 / numPlayers1)))
     end
     if numPlayers2 > 1 then
         table.insert(self.team2UI.playerRows,
-            CreateScoreboardRow(self.team2UI.tableBackground, kHeaderRowColor, kAlienHeaderRowTextColor, "Total", printNum(totalKills2), printNum(totalAssists2), printNum(totalDeaths2), " ", round(team2Score, 0), humanNumber(totalPdmg2),
-                humanNumber(totalSdmg2), minutesToStringTime(totalTimeBuilding2)))
+            CreateScoreboardRow(self.team2UI.tableBackground, kHeaderRowColor, kAlienHeaderRowTextColor, "Total", printNum(totalKills2), printNum(totalAssists2), printNum(totalDeaths2), " ", round(team2Score, 0), humanNumber(roundNumber(totalPdmg2, 0)),
+                humanNumber(roundNumber(totalSdmg2, 0)), minutesToStringTime(totalTimeBuilding2)))
         table.insert(self.team2UI.playerRows,
             CreateScoreboardRow(self.team2UI.tableBackground, kAverageRowColor, kAverageRowTextColor, "Average", round(totalKills2 / numPlayers2, 0), round(totalAssists2 / numPlayers2, 0), round(totalDeaths2 / numPlayers2, 0),
-                string.format("%s%%", round(avgAccuracy2, 0)), round(team2Score / numPlayers2, 0), humanNumber(totalPdmg2 / numPlayers2), humanNumber(totalSdmg2 / numPlayers2), minutesToStringTime(totalTimeBuilding2 / numPlayers2),
+                string.format("%s%%", round(avgAccuracy2, 0)), round(team2Score / numPlayers2, 0), humanNumber(roundNumber(totalPdmg2 / numPlayers2, 0)), humanNumber(roundNumber(totalSdmg2 / numPlayers2, 0)), minutesToStringTime(totalTimeBuilding2 / numPlayers2),
                 minutesToStringTime(totalMapTime2 / numPlayers2), minutesToStringTime(totalTimePlaying2 / numPlayers2)))
     end
 
