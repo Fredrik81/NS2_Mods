@@ -1901,6 +1901,10 @@ function GUIGameEndStats:LoadLastRoundStats()
                 presGraphTableMarines = parsedFile.presGraphTableMarines or {}
                 presGraphTableAliens = parsedFile.presGraphTableAliens or {}
 
+                if miscDataTable and not miscDataTable.winningTeam then
+                    miscDataTable.winningTeam = 0
+                end
+
                 if #hiveSkillGraphTable == 0 then
                     estimateHiveSkillGraph()
                 end
@@ -4087,7 +4091,8 @@ function GUIGameEndStats:ProcessStats()
     self:SetTeamName(self.team1UI, miscDataTable.team1Name or Locale.ResolveString("NAME_TEAM_1"))
     self:SetTeamName(self.team2UI, miscDataTable.team2Name or Locale.ResolveString("NAME_TEAM_2"))
     local team1Result, team2Result = "DRAW", "DRAW"
-    if miscDataTable.winningTeam > 0 then
+
+    if miscDataTable.winningTeam and miscDataTable.winningTeam > 0 then -- ToDo: Handle when this is missing, e.g. when the server crashes and the game ends abruptly
         team1Result = miscDataTable.winningTeam == kMarineTeamType and "WINNER" or "LOSER"
         team2Result = miscDataTable.winningTeam == kAlienTeamType and "WINNER" or "LOSER"
     end
