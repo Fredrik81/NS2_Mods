@@ -17,8 +17,7 @@ local kTrackedTechUpgradeNamesVanilla = {
     "Adrenaline",
     "Crush",
     "Parasite",
-    "DualMinigunExosuit",
-    "DualRailgunExosuit"
+    "Exosuit"
 }
 
 local kTrackedTechUpgradeNamesCBM = {
@@ -39,8 +38,7 @@ local kTrackedTechUpgradeNamesCBM = {
     "Adrenaline",
     "Crush",
     "Parasite",
-    "DualMinigunExosuit",
-    "DualRailgunExosuit"
+    "Exosuit"
 }
 
 local techUpgradesTable = {}
@@ -136,11 +134,7 @@ function PlayerInfoEntity:UpdateScore()
         local scorePlayer = Shared.GetEntity(self.playerId)
         if scorePlayer and self.currentTech then
             if scorePlayer:isa("Exo") then
-                if scorePlayer:GetHasMinigun() and techUpgradesBitmask[kTechId.DualMinigunExosuit] then
-                    self.currentTech = bit.bor(self.currentTech, techUpgradesBitmask[kTechId.DualMinigunExosuit])
-                elseif scorePlayer:GetHasRailgun() and techUpgradesBitmask[kTechId.DualRailgunExosuit] then
-                    self.currentTech = bit.bor(self.currentTech, techUpgradesBitmask[kTechId.DualRailgunExosuit])
-                end
+                self.currentTech = bit.bor(self.currentTech, techUpgradesBitmask[kTechId.Exosuit])
             end
         end
     end

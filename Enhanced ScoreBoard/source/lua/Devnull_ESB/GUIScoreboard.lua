@@ -1206,19 +1206,6 @@ function GUIScoreboard:UpdateTeam_CommanderName(playerObject, teamObject)
                 playerObject.playerStatus = Locale.ResolveString("STATUS_JETPACK")
             end
         end
-        if table.icontains(playerObject.currentTech, kTechId.DualMinigunExosuit) then
-            if playerObject.playerStatus ~= "" and playerObject.playerStatus ~= " " then
-                playerObject.playerStatus = string.format("%s-%s", playerObject.playerStatus, "Mini")
-            else
-                playerObject.playerStatus = Locale.ResolveString("HELP_SCREEN_EXO_MINIGUN")
-            end
-        elseif table.icontains(playerObject.currentTech, kTechId.DualRailgunExosuit) then
-            if playerObject.playerStatus ~= "" and playerObject.playerStatus ~= " " then
-                playerObject.playerStatus = string.format("%s-%s", playerObject.playerStatus, "Rail")
-            else
-                playerObject.playerStatus = Locale.ResolveString("HELP_SCREEN_EXO_RAILGUN")
-            end
-        end
     end
 
     if (playerObject.isCommander or (playerObject.isLastComm and not playerObject.isBot)) and teamObject.isPlayingTeam then
@@ -1723,29 +1710,15 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
             lifeformCount = 0
             for index, playerRecord in ipairs(teamObject.teamScores) do
                 local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
-                if table.icontains(currentTech, kTechId.DualMinigunExosuit) then
+                if table.icontains(currentTech, kTechId.Exosuit) then
                     lifeformCount = lifeformCount + 1
                 end
             end
-            if lifeformCount ~= EALitems[kTechId.DualMinigunExosuit].count then
-                EALitems[kTechId.DualMinigunExosuit].count = lifeformCount
-                EALitems[kTechId.DualMinigunExosuit].text:SetText(tostring(EALitems[kTechId.DualMinigunExosuit].count))
-                EALitems[kTechId.DualMinigunExosuit].textShadow:SetText(tostring(EALitems[kTechId.DualMinigunExosuit].count))
-                EALitems[kTechId.DualMinigunExosuit].icon:SetColor(EALitems[kTechId.DualMinigunExosuit].count > 0 and kEalActiveColor or kEalInactiveColor)
-            end
-
-            lifeformCount = 0
-            for index, playerRecord in ipairs(teamObject.teamScores) do
-                local currentTech = GetTechIdsFromBitMask(playerRecord.Tech)
-                if table.icontains(currentTech, kTechId.DualRailgunExosuit) then
-                    lifeformCount = lifeformCount + 1
-                end
-            end
-            if lifeformCount ~= EALitems[kTechId.DualRailgunExosuit].count then
-                EALitems[kTechId.DualRailgunExosuit].count = lifeformCount
-                EALitems[kTechId.DualRailgunExosuit].text:SetText(tostring(EALitems[kTechId.DualRailgunExosuit].count))
-                EALitems[kTechId.DualRailgunExosuit].textShadow:SetText(tostring(EALitems[kTechId.DualRailgunExosuit].count))
-                EALitems[kTechId.DualRailgunExosuit].icon:SetColor(EALitems[kTechId.DualRailgunExosuit].count > 0 and kEalActiveColor or kEalInactiveColor)
+            if lifeformCount ~= EALitems[kTechId.Exosuit].count then
+                EALitems[kTechId.Exosuit].count = lifeformCount
+                EALitems[kTechId.Exosuit].text:SetText(tostring(EALitems[kTechId.Exosuit].count))
+                EALitems[kTechId.Exosuit].textShadow:SetText(tostring(EALitems[kTechId.Exosuit].count))
+                EALitems[kTechId.Exosuit].icon:SetColor(EALitems[kTechId.Exosuit].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
         elseif teamObject.teamNumber == kTeam2Index then
             lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_SKULK"), true)
@@ -2524,6 +2497,7 @@ function GUIScoreboard:SendKeyEvent(key, down)
         return false
     end
 
+    -- Scoreboard bind-check
     if GetIsBinding(key, "Scoreboard") then
         self.visible = down and not self.hiddenOverride
         if not self.visible then
@@ -2540,112 +2514,131 @@ function GUIScoreboard:SendKeyEvent(key, down)
         return false
     end
 
-    if key == InputKey.MouseButton0 and self.mousePressed["LMB"]["Down"] ~= down and down and not MainMenu_GetIsOpened() then
-        HandlePlayerTextClicked(self)
+    if key == InputKey.MouseButton0 then
+        local lmbState = self.mousePressed["LMB"]
 
-        local steamId = GetSteamIdForClientIndex(self.hoverPlayerClientIndex) or 0
-        if self.hoverMenu.background:GetIsVisible() then
-            -- Display the menu for bots if dev mode is on (steamId is 0 but they have a proper clientIndex)
-            return false
-        elseif steamId ~= 0 or self.hoverPlayerClientIndex ~= 0 and Shared.GetDevMode() then
-            local isTextMuted = ChatUI_GetSteamIdTextMuted(steamId)
-            local isVoiceMuted = ChatUI_GetClientMuted(self.hoverPlayerClientIndex)
-            local function openSteamProf()
-                Client.ShowWebpage(string.format("%s[U:1:%s]", kSteamProfileURL, steamId))
-            end
-            local function openNS2PanelProf()
-                Client.ShowWebpage(string.format(kNS2PanelProfileURL, steamId))
-            end
-            local function muteText()
-                ChatUI_SetSteamIdTextMuted(steamId, not isTextMuted)
-            end
-            local function muteVoice()
-                ChatUI_SetClientMuted(self.hoverPlayerClientIndex, not isVoiceMuted)
-            end
+        if lmbState["Down"] ~= down then
+            if down then
+                if not MainMenu_GetIsOpened() then
+                    HandlePlayerTextClicked(self)
 
-            self.hoverMenu:ResetButtons()
+                    if self.hoverMenu.background:GetIsVisible() then
+                        return false
+                    end
 
-            local teamColorBg
-            local teamColorHighlight
-            local playerName = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "Name")
-            local teamNumber = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "EntityTeamNumber")
-            local isCommander = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "IsCommander") and GetIsVisibleTeam(teamNumber)
+                    local steamId = GetSteamIdForClientIndex(self.hoverPlayerClientIndex) or 0
 
-            local textColor = Color(1, 1, 1, 1)
-            local nameBgColor = Color(0, 0, 0, 0)
+                    if steamId ~= 0 or (self.hoverPlayerClientIndex ~= 0 and Shared.GetDevMode()) then
+                        local isTextMuted = ChatUI_GetSteamIdTextMuted(steamId)
+                        local isVoiceMuted = ChatUI_GetClientMuted(self.hoverPlayerClientIndex)
 
-            if isCommander then
-                teamColorBg = GUIScoreboard.kCommanderFontColor
-            elseif teamNumber == kMarineTeamType then
-                teamColorBg = GUIScoreboard.kBlueColor
-            elseif teamNumber == kAlienTeamType then
-                teamColorBg = GUIScoreboard.kRedColor
+                        local function openSteamProf()
+                            Client.ShowWebpage(string.format("%s[U:1:%s]", kSteamProfileURL, steamId))
+                        end
+                        local function openNS2PanelProf()
+                            Client.ShowWebpage(string.format(kNS2PanelProfileURL, steamId))
+                        end
+                        local function muteText()
+                            ChatUI_SetSteamIdTextMuted(steamId, not isTextMuted)
+                        end
+                        local function muteVoice()
+                            ChatUI_SetClientMuted(self.hoverPlayerClientIndex, not isVoiceMuted)
+                        end
+
+                        self.hoverMenu:ResetButtons()
+
+                        local teamNumber = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "EntityTeamNumber")
+                        local isCommander = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "IsCommander") and GetIsVisibleTeam(teamNumber)
+
+                        local teamColorBg
+                        if isCommander then
+                            teamColorBg = GUIScoreboard.kCommanderFontColor
+                        elseif teamNumber == kMarineTeamType then
+                            teamColorBg = GUIScoreboard.kBlueColor
+                        elseif teamNumber == kAlienTeamType then
+                            teamColorBg = GUIScoreboard.kRedColor
+                        else
+                            teamColorBg = GUIScoreboard.kSpectatorColor
+                        end
+
+                        local bgColor = teamColorBg * 0.1
+                        bgColor.a = 0.9
+
+                        local teamColorHighlight = teamColorBg * 0.75
+                        local teamColorHalf = teamColorBg * 0.5
+
+                        local textColor = Color(1, 1, 1, 1)
+                        local nameBgColor = Color(0, 0, 0, 0)
+                        local playerName = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "Name")
+
+                        self.hoverMenu:SetBackgroundColor(bgColor)
+                        self.hoverMenu:AddButton(playerName, nameBgColor, nameBgColor, textColor)
+                        self.hoverMenu:AddButton(Locale.ResolveString("SB_MENU_STEAM_PROFILE"), teamColorHalf, teamColorHighlight, textColor, openSteamProf)
+                        self.hoverMenu:AddButton("NS2Panel profile", teamColorHalf, teamColorHighlight, textColor, openNS2PanelProf)
+
+                        if Client.GetSteamId() ~= steamId then
+                            self.hoverMenu:AddSeparator("muteOptions")
+                            self.hoverMenu:AddButton(ConditionalValue(isVoiceMuted, Locale.ResolveString("SB_MENU_UNMUTE_VOICE"), Locale.ResolveString("SB_MENU_MUTE_VOICE")), teamColorHalf, teamColorHighlight, textColor, muteVoice)
+                            self.hoverMenu:AddButton(ConditionalValue(isTextMuted, Locale.ResolveString("SB_MENU_UNMUTE_TEXT"), Locale.ResolveString("SB_MENU_MUTE_TEXT")), teamColorHalf, teamColorHighlight, textColor, muteText)
+                        end
+
+                        self.hoverMenu:Show()
+                        self.badgeNameTooltip:Hide(0)
+                    end
+                end
+
+                lmbState["Down"] = true
+                local mouseX, mouseY = Client.GetCursorPosScreen()
+                self.isDragging = GUIItemContainsPoint(self.slidebarBg, mouseX, mouseY)
+
+                if not MouseTracker_GetIsVisible() then
+                    SetMouseVisible(self, true)
+                else
+                    HandlePlayerVoiceClicked(self)
+                end
+
+                return true
             else
-                teamColorBg = GUIScoreboard.kSpectatorColor
+                lmbState["Down"] = false
             end
-
-            local bgColor = teamColorBg * 0.1
-            bgColor.a = 0.9
-
-            teamColorHighlight = teamColorBg * 0.75
-            teamColorBg = teamColorBg * 0.5
-
-            self.hoverMenu:SetBackgroundColor(bgColor)
-            self.hoverMenu:AddButton(playerName, nameBgColor, nameBgColor, textColor)
-            self.hoverMenu:AddButton(Locale.ResolveString("SB_MENU_STEAM_PROFILE"), teamColorBg, teamColorHighlight, textColor, openSteamProf)
-            self.hoverMenu:AddButton("NS2Panel profile", teamColorBg, teamColorHighlight, textColor, openNS2PanelProf)
-
-            if Client.GetSteamId() ~= steamId then
-                self.hoverMenu:AddSeparator("muteOptions")
-                self.hoverMenu:AddButton(ConditionalValue(isVoiceMuted, Locale.ResolveString("SB_MENU_UNMUTE_VOICE"), Locale.ResolveString("SB_MENU_MUTE_VOICE")), teamColorBg, teamColorHighlight, textColor, muteVoice)
-                self.hoverMenu:AddButton(ConditionalValue(isTextMuted, Locale.ResolveString("SB_MENU_UNMUTE_TEXT"), Locale.ResolveString("SB_MENU_MUTE_TEXT")), teamColorBg, teamColorHighlight, textColor, muteText)
-            end
-
-            self.hoverMenu:Show()
-            self.badgeNameTooltip:Hide(0)
         end
     end
 
-    if key == InputKey.MouseButton0 and self.mousePressed["LMB"]["Down"] ~= down then
-        self.mousePressed["LMB"]["Down"] = down
-        if down then
-            local mouseX, mouseY = Client.GetCursorPosScreen()
-            self.isDragging = GUIItemContainsPoint(self.slidebarBg, mouseX, mouseY)
-
-            if not MouseTracker_GetIsVisible() then
-                SetMouseVisible(self, true)
-            else
-                HandlePlayerVoiceClicked(self)
-            end
-
-            return true
-        end
-    end
-
-    if self.slidebarBg:GetIsVisible() then
-        if key == InputKey.MouseWheelDown then
+    if key == InputKey.MouseWheelDown then
+        if self.slidebarBg:GetIsVisible() then
             self.slidePercentage = math.min(self.slidePercentage + 5, 100)
             return true
-        elseif key == InputKey.MouseWheelUp then
+        end
+    elseif key == InputKey.MouseWheelUp then
+        if self.slidebarBg:GetIsVisible() then
             self.slidePercentage = math.max(self.slidePercentage - 5, 0)
             return true
-        elseif key == InputKey.PageDown and down then
+        end
+    elseif key == InputKey.PageDown and down then
+        if self.slidebarBg:GetIsVisible() then
             self.slidePercentage = math.min(self.slidePercentage + 10, 100)
             return true
-        elseif key == InputKey.PageUp and down then
+        end
+    elseif key == InputKey.PageUp and down then
+        if self.slidebarBg:GetIsVisible() then
             self.slidePercentage = math.max(self.slidePercentage - 10, 0)
             return true
-        elseif key == InputKey.Home then
+        end
+    elseif key == InputKey.Home then
+        if self.slidebarBg:GetIsVisible() then
             self.slidePercentage = 0
             return true
-        elseif key == InputKey.End then
+        end
+    elseif key == InputKey.End then
+        if self.slidebarBg:GetIsVisible() then
             self.slidePercentage = 100
             return true
         end
     end
+
+    return false
 end
 
--- ToDo: eal
 local function CreateEALIcon(container, Texture, TextureVector, TextureSize, IconNr, haveNumber, sTooltip)
     PROFILE("GUIScoreboard:CreateEALIcon")
     local containerSize = container:GetSize()
@@ -2772,11 +2765,8 @@ function GUIScoreboard:CreateEALGraphicHeader(team, color, logoTexture, logoCoor
 
         EALitems[kTechId.Jetpack] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 12, 340, 114 * 13}, Vector(72, 24, 0), 6.75, true, Locale.ResolveString(LookupTechData(kTechId.Jetpack, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.DualMinigunExosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 14, 340, 114 * 15}, Vector(72, 24, 0), 7.5, true,
-            Locale.ResolveString(LookupTechData(kTechId.DualMinigunExosuit, kTechDataDisplayName, "unknown")))
-
-        EALitems[kTechId.DualRailgunExosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 13, 340, 114 * 14}, Vector(72, 24, 0), 8.5, true,
-            Locale.ResolveString(LookupTechData(kTechId.DualRailgunExosuit, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Exosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 16, 340, 114 * 17}, Vector(72, 24, 0), 7.5, true,
+            Locale.ResolveString(LookupTechData(kTechId.Exosuit, kTechDataDisplayName, "unknown")))
     elseif team == kTeam2Index then
         EALitems[kTechId.Skulk] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 0, 340, 114 * 1}, Vector(72, 24, 0), 0, true, Locale.ResolveString(LookupTechData(kTechId.Skulk, kTechDataDisplayName, "unknown")))
 

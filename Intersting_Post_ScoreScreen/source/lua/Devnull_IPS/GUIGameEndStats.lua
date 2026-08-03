@@ -4105,8 +4105,8 @@ function GUIGameEndStats:ProcessStats()
     -- Don't even bother displaying this, it looks odd
     if numPlayers1 > 1 then
         table.insert(self.team1UI.playerRows,
-            CreateScoreboardRow(self.team1UI.tableBackground, kHeaderRowColor, kMarineHeaderRowTextColor, "Total", printNum(totalKills1), printNum(totalAssists1), printNum(totalDeaths1), " ", round(team1Score, 0), humanNumber(roundNumber(totalPdmg1, 0)),
-                humanNumber(roundNumber(totalSdmg1, 0)), minutesToStringTime(totalTimeBuilding1)))
+            CreateScoreboardRow(self.team1UI.tableBackground, kHeaderRowColor, kMarineHeaderRowTextColor, "Total", printNum(totalKills1), printNum(totalAssists1), printNum(totalDeaths1), " ", round(team1Score, 0),
+                humanNumber(roundNumber(totalPdmg1, 0)), humanNumber(roundNumber(totalSdmg1, 0)), minutesToStringTime(totalTimeBuilding1)))
         table.insert(self.team1UI.playerRows,
             CreateScoreboardRow(self.team1UI.tableBackground, kAverageRowColor, kAverageRowTextColor, "Average", round(totalKills1 / numPlayers1, 0), round(totalAssists1 / numPlayers1, 0), round(totalDeaths1 / numPlayers1, 0),
                 avgAccuracy1Onos == -1 and string.format("%s%%", round(avgAccuracy1, 0)) or string.format("%s%% (%s%%)", round(avgAccuracy1, 0), round(avgAccuracy1Onos, 0)), round(team1Score / numPlayers1, 0),
@@ -4115,12 +4115,12 @@ function GUIGameEndStats:ProcessStats()
     end
     if numPlayers2 > 1 then
         table.insert(self.team2UI.playerRows,
-            CreateScoreboardRow(self.team2UI.tableBackground, kHeaderRowColor, kAlienHeaderRowTextColor, "Total", printNum(totalKills2), printNum(totalAssists2), printNum(totalDeaths2), " ", round(team2Score, 0), humanNumber(roundNumber(totalPdmg2, 0)),
-                humanNumber(roundNumber(totalSdmg2, 0)), minutesToStringTime(totalTimeBuilding2)))
+            CreateScoreboardRow(self.team2UI.tableBackground, kHeaderRowColor, kAlienHeaderRowTextColor, "Total", printNum(totalKills2), printNum(totalAssists2), printNum(totalDeaths2), " ", round(team2Score, 0),
+                humanNumber(roundNumber(totalPdmg2, 0)), humanNumber(roundNumber(totalSdmg2, 0)), minutesToStringTime(totalTimeBuilding2)))
         table.insert(self.team2UI.playerRows,
             CreateScoreboardRow(self.team2UI.tableBackground, kAverageRowColor, kAverageRowTextColor, "Average", round(totalKills2 / numPlayers2, 0), round(totalAssists2 / numPlayers2, 0), round(totalDeaths2 / numPlayers2, 0),
-                string.format("%s%%", round(avgAccuracy2, 0)), round(team2Score / numPlayers2, 0), humanNumber(roundNumber(totalPdmg2 / numPlayers2, 0)), humanNumber(roundNumber(totalSdmg2 / numPlayers2, 0)), minutesToStringTime(totalTimeBuilding2 / numPlayers2),
-                minutesToStringTime(totalMapTime2 / numPlayers2), minutesToStringTime(totalTimePlaying2 / numPlayers2)))
+                string.format("%s%%", round(avgAccuracy2, 0)), round(team2Score / numPlayers2, 0), humanNumber(roundNumber(totalPdmg2 / numPlayers2, 0)), humanNumber(roundNumber(totalSdmg2 / numPlayers2, 0)),
+                minutesToStringTime(totalTimeBuilding2 / numPlayers2), minutesToStringTime(totalMapTime2 / numPlayers2), minutesToStringTime(totalTimePlaying2 / numPlayers2)))
     end
 
     local gameInfo = GetGameInfoEntity()
@@ -5362,6 +5362,173 @@ function GUIGameEndStats:SendKeyEvent(key, down)
 
     if self.sliderBarBg:GetIsVisible() and not self.hoverMenu.background:GetIsVisible() then
         local maxPos = self.contentSize - kContentMaxYSize
+        if key == InputKey.MouseButton0 and self.mousePressed ~= down then
+            self.mousePressed = down
+            if down then
+                local mouseX, mouseY = Client.GetCursorPosScreen()
+                self.isDragging = GUIItemContainsPoint(self.sliderBarBg, mouseX, mouseY) or GUIItemContainsPoint(self.slider, mouseX, mouseY)
+                return true
+            end
+        elseif key == InputKey.MouseWheelDown then
+            self.slideOffset = math.min(self.slideOffset + GUILinearScale(75), maxPos)
+            return true
+        elseif key == InputKey.MouseWheelUp then
+            self.slideOffset = math.max(self.slideOffset - GUILinearScale(75), 0)
+            return true
+        elseif key == InputKey.PageDown and down then
+            self.slideOffset = math.min(self.slideOffset + kContentMaxYSize / 2, maxPos)
+            return true
+        elseif key == InputKey.PageUp and down then
+            self.slideOffset = math.max(self.slideOffset - kContentMaxYSize / 2, 0)
+            return true
+        elseif key == InputKey.Home then
+            self.slideOffset = 0
+            return true
+        elseif key == InputKey.End then
+            self.slideOffset = maxPos
+            return true
+        end
+    end
+
+    return false
+end
+
+function GUIGameEndStats:SendKeyEvent(key, down)
+    PROFILE("GUIGameEndStats:SendKeyEvent")
+
+    -- 1. RequestMenu (Deathstats) toggle
+    if GetIsBinding(key, "RequestMenu") then
+        -- Kolla om knappstatusen ändrats FÖRE vi kör tunga/globala funktionsanrop
+        if self.prevRequestKey ~= down then
+            self.prevRequestKey = down
+
+            if GetAdvancedOption("deathstats") > 0 and not ChatUI_EnteringChatMessage() and not MainMenu_GetIsOpened() and (not GetGameStarted() or GetIsOnNeutralTeam()) then
+
+                if down then
+                    lastDown = Shared.GetTime()
+                else
+                    if self:GetIsVisible() then
+                        self:SetIsVisible(false)
+                    elseif lastDown + kKeyTapTiming > Shared.GetTime() then
+                        self:SetIsVisible(true)
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. Scoreboard toggle
+    if GetIsBinding(key, "Scoreboard") then
+        if self.prevScoreKey ~= down then
+            self.prevScoreKey = down
+            if down then
+                lastDisplayStatus = self:GetIsVisible()
+                if lastDisplayStatus then
+                    self:SetIsVisible(false)
+                end
+            elseif lastDisplayStatus and not self:GetIsVisible() then
+                self:SetIsVisible(lastDisplayStatus)
+            end
+        end
+    end
+
+    -- =========================================================================
+    -- TIDIG EXIT: Om UI:t inte är synligt finns det ingen anledning att köra
+    -- tunga mus-, tangent- eller scrollbar-kontroller. Hoppa ut direkt!
+    -- =========================================================================
+    if not self:GetIsVisible() then
+        return false
+    end
+
+    -- 3. Stäng med Escape när UI syns
+    if key == InputKey.Escape and down then
+        self:SetIsVisible(false)
+        return true
+    end
+
+    -- 4. Musknapp 0 (Vänsterklick)
+    if key == InputKey.MouseButton0 and down then
+        local mouseX, mouseY = Client.GetCursorPosScreen()
+
+        -- Stängknapp
+        if GUIItemContainsPoint(self.closeButton, mouseX, mouseY) then
+            StartSoundEffect(kButtonClickSound)
+            self:SetIsVisible(false)
+            return true
+        end
+
+        -- Spelarmeny / Rader
+        if self.lastRow then
+            local isHoverMenuVisible = self.hoverMenu.background:GetIsVisible()
+
+            if not isHoverMenuVisible then
+                local steamId = self.lastRow.steamId
+                self.hoverMenu:ResetButtons()
+
+                -- Cacha färgen en gång istället för 3 anrop till GetColor()
+                local parentColor = self.lastRow.background:GetParent():GetColor()
+                local textColor = Color(1, 1, 1, 1)
+                local nameBgColor = Color(0, 0, 0, 0)
+
+                local teamColorHighlight = parentColor * 0.25
+                teamColorHighlight.a = 1
+                local teamColorBg = parentColor * 0.5
+                teamColorBg.a = 1
+                local bgColor = parentColor * 0.75
+                bgColor.a = 0.9
+
+                self.hoverMenu:SetBackgroundColor(bgColor)
+
+                local name = self.lastRow.playerName:GetText()
+                if self.lastRow.hiveSkillTier then
+                    name = string.format("[%s] %s", self.lastRow.hiveSkillTier, name)
+                end
+
+                self.hoverMenu:AddButton(name, nameBgColor, nameBgColor, textColor)
+                self.hoverMenu:AddButton(Locale.ResolveString("SB_MENU_STEAM_PROFILE"), teamColorBg, teamColorHighlight, textColor, function()
+                    Client.ShowWebpage(string.format("%s[U:1:%s]", kSteamProfileURL, steamId))
+                end)
+                self.hoverMenu:AddButton("NS2Panel profile", teamColorBg, teamColorHighlight, textColor, function()
+                    Client.ShowWebpage(string.format("%s%s", kNs2PanelUserURL, steamId))
+                end)
+
+                StartSoundEffect(kButtonClickSound)
+                self.hoverMenu:Show()
+                return true
+
+            elseif not GUIItemContainsPoint(self.hoverMenu.background, mouseX, mouseY) then
+                self.hoverMenu:Hide()
+            end
+
+            -- Sortering av kolumner
+            if highlightedField ~= nil then
+                if highlightedFieldMarine then
+                    if lastSortedT1 == highlightedField then
+                        lastSortedT1WasInv = not lastSortedT1WasInv
+                    else
+                        lastSortedT1WasInv = false
+                        lastSortedT1 = highlightedField
+                    end
+                else
+                    if lastSortedT2 == highlightedField then
+                        lastSortedT2WasInv = not lastSortedT2WasInv
+                    else
+                        lastSortedT2WasInv = false
+                        lastSortedT2 = highlightedField
+                    end
+                end
+
+                StartSoundEffect(kButtonClickSound)
+                SortByColumn(self, highlightedFieldMarine, highlightedField, highlightedFieldMarine and lastSortedT1WasInv or lastSortedT2WasInv)
+                return true
+            end
+        end
+    end
+
+    -- 5. Scroll / Slider-hantering (Körs endast om slidern är synlig och hover-menyn är stängd)
+    if self.sliderBarBg:GetIsVisible() and not self.hoverMenu.background:GetIsVisible() then
+        local maxPos = self.contentSize - kContentMaxYSize
+
         if key == InputKey.MouseButton0 and self.mousePressed ~= down then
             self.mousePressed = down
             if down then
