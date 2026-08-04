@@ -180,6 +180,42 @@ local function dump(o)
     end
 end
 
+local function InspectUserdata(ud)
+    if type(ud) ~= "userdata" then
+        print(string.format("Objektet is not userdata! Is type '%s'", type(ud)))
+        return
+    end
+
+    -- debug.getmetatable är säkrare än getmetatable om metatabellen är skyddad
+    local mt = debug.getmetatable(ud) or getmetatable(ud)
+
+    if not mt then
+        print("This object have no meta tabel.")
+        return
+    end
+
+    print("================ USERDATA INSPECTION ================")
+
+    -- 1. Skriv ut direkt innehåll i metatabellen (t.ex. __eq, __tostring, __gc)
+    print("\n--- Meta tabel keys (Metamethods) ---")
+    for k, v in pairs(mt) do
+        print(string.format("  %-25s [%s]", tostring(k), type(v)))
+    end
+
+    -- 2. Om __index är en tabell (vanligast i C++ / Luabind-bindings)
+    if type(mt.__index) == "table" then
+        print("\n--- Methods and veriables in __index ---")
+        for k, v in pairs(mt.__index) do
+            print(string.format("  %-25s [%s]", tostring(k), type(v)))
+        end
+    elseif type(mt.__index) == "function" then
+        print("\n--- __index is a C-function ---")
+        print("  Methods is dynamic and cannot be listed with pairs().")
+    end
+
+    print("====================================================")
+end
+
 -- Round function implementation with round up and decimal
 local function round(number, decimals)
     PROFILE("round")
@@ -286,6 +322,24 @@ local function getPlayerStats(steamId)
         return playerStatsTable[steamId]
     end
     return nil
+end
+
+local function ResolveLocalizedString(key)
+    if not key then
+        return ""
+    end
+
+    local cachedValue = kResolvedStrings[key]
+    if cachedValue ~= nil then
+        return cachedValue
+    end
+
+    local resolvedValue = Locale.ResolveString(key)
+    if resolvedValue ~= nil then
+        kResolvedStrings[key] = resolvedValue
+    end
+
+    return resolvedValue
 end
 
 local function populateResolveStrings()
@@ -874,9 +928,10 @@ function GUIScoreboard:Update_TeamsInfo() -- ToDo: Why does this function get al
     local teamGUISize = {}
     local fetchTable = {}
 
-    for index, team in ipairs(self.teams) do
+    for index, team in ipairs(self.teams) do -- ToDo: Move this into seperate function
         -- Update coms info
         local scores = team["GetScores"]()
+
         for _, player in pairs(scores) do
             local steamId = GetSteamIdForClientIndex((player and player.ClientIndex) and player.ClientIndex or nil)
             if steamId and steamId > 0 then
@@ -893,10 +948,13 @@ function GUIScoreboard:Update_TeamsInfo() -- ToDo: Why does this function get al
             end
         end
 
+        local numPlayers = table.icount(scores) or 0
+        team["GUIs"]["Background"]:SetIsVisible(vis and (numPlayers > 0))
+
         -- Update connecting players info
-        local numPlayers = table.icount(scores)
-        if team.TeamNumber == 0 and numPlayers == 0 and PlayerUI_GetNumConnectingPlayers() > 0 then
-            numPlayers = PlayerUI_GetNumConnectingPlayers()
+        local numConnectingPlayers = PlayerUI_GetNumConnectingPlayers() or 0
+        if team.TeamNumber == 0 and numConnectingPlayers > 0 then
+            numPlayers = numPlayers + numConnectingPlayers
         end
 
         if vis then -- The heavy parts, updates each player line
@@ -1079,13 +1137,14 @@ function GUIScoreboard:Update_SetMainVisibles()
     local displayScoreboard = vis and self.slidePercentage > -1 and not self.hiddenOverride
     local isACommander = PlayerUI_IsACommander()
 
+    local gInfo = GetGameInfoEntity()
+    isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
+
     self.clickForMouseBackground:SetIsVisible(vis and not self.mouseVisible and not isACommander)
     self.gameTimeBackground:SetIsVisible(displayScoreboard)
     self.gameTime:SetIsVisible(displayScoreboard)
     self.background:SetIsVisible(displayScoreboard)
     self.scoreboardBackground:SetIsVisible(displayScoreboard)
-
-    ---
 
     if lastScoreboardVisState ~= displayScoreboard then
         lastScoreboardVisState = displayScoreboard
@@ -1102,14 +1161,10 @@ function GUIScoreboard:Update_SetMainVisibles()
         end
     end
 
-    ---
-
     if not vis then
         SetMouseVisible(self, false)
         self.slidePercentage = -1
     end
-
-    ---
 
     if self.hoverMenu.background:GetIsVisible() then
         if not vis then
@@ -1118,24 +1173,12 @@ function GUIScoreboard:Update_SetMainVisibles()
     else
         self.hoverPlayerClientIndex = 0
     end
-
-    ---
-
-    for index, team in ipairs(self.teams) do
-        local numPlayers = table.icount(team["GetScores"]())
-        team["GUIs"]["Background"]:SetIsVisible(vis and (numPlayers > 0))
-    end
-
-    --
-
 end
 
 function GUIScoreboard:Update(deltaTime)
     PROFILE("GUIScoreboard:Update")
 
     local vis = self.visible and not self.hiddenOverride
-    local gInfo = GetGameInfoEntity()
-    isPreGame = (gInfo and gInfo:GetState() <= kGameState.PreGame)
 
     self:Update_SetMainVisibles()
 
@@ -1316,6 +1359,17 @@ function GUIScoreboard:UpdateTeam_HighlightCurrentPlayer(playerObject, teamObjec
     end
 end
 
+local function GetPlayerBadgeData(playerGUIItem, clientIndex)
+    if clientIndex and playerGUIItem.badgeDataClientIndex ~= clientIndex then
+        local badgeTextures, badgeNames = Badges_GetBadgeTextures(clientIndex, "scoreboard")
+        playerGUIItem.badgeTextures = badgeTextures
+        playerGUIItem.badgeNames = badgeNames
+        playerGUIItem.badgeDataClientIndex = clientIndex
+    end
+
+    return playerGUIItem.badgeTextures or {}, playerGUIItem.badgeNames or {}
+end
+
 function GUIScoreboard:UpdateTeam_PlayersPlaceAndName(playerObject)
     PROFILE("GUIScoreboard:UpdateTeam_PlayersPlaceAndName")
 
@@ -1333,14 +1387,15 @@ function GUIScoreboard:UpdateTeam_PlayersPlaceAndName(playerObject)
     local statusPos = ConditionalValue(GUIScoreboard.screenWidth < 1280, GUIScoreboard.kPlayerItemWidth + 30, (self:GetTeamItemWidth() - GUIScoreboard.kTeamColumnSpacingX * 10) + 60)
     local playerStatus = playerObject.playerGUIItem["Status"]:GetText()
 
-    if playerStatus == "-" or (playerStatus ~= Locale.ResolveString("STATUS_SPECTATOR") and playerObject["teamNumber"] ~= kTeam1Index and playerObject["teamNumber"] ~= kTeam2Index) then
+    if playerStatus == "-" or (playerStatus ~= ResolveLocalizedString("STATUS_SPECTATOR") and playerObject["teamNumber"] ~= kTeam1Index and playerObject["teamNumber"] ~= kTeam2Index) then
         playerObject.playerGUIItem["Status"]:SetText("")
         statusPos = statusPos + GUIScoreboard.kTeamColumnSpacingX * ConditionalValue(GUIScoreboard.screenWidth < 1280, 2.75, 1.75)
     end
 
-    SetPlayerItemBadges(playerObject.playerGUIItem, Badges_GetBadgeTextures(playerObject["clientIndex"], "scoreboard"))
+    local badgeTextures = GetPlayerBadgeData(playerObject.playerGUIItem, playerObject["clientIndex"])
+    SetPlayerItemBadges(playerObject.playerGUIItem, badgeTextures)
 
-    local numBadges = math.min(#Badges_GetBadgeTextures(playerObject["clientIndex"], "scoreboard"), #playerObject.playerGUIItem["BadgeItems"])
+    local numBadges = math.min(#badgeTextures, #playerObject.playerGUIItem["BadgeItems"])
     local pos = (numberSize + kPlayerItemLeftMargin + numBadges * kPlayerVoiceChatIconSize + numBadges * kPlayerBadgeRightPadding) * GUIScoreboard.kScalingFactor
 
     playerObject.playerGUIItem["Name"]:SetPosition(Vector(pos, 0, 0))
@@ -1398,7 +1453,7 @@ function GUIScoreboard:UpdateTeam_SkillIcons(playerObject)
         playerObject.playerGUIItem.SkillIcon:SetTexture(kPlayerSkillIconTexture)
         playerObject.playerGUIItem.SkillIcon:SetSize(kPlayerSkillIconSize * GUIScoreboard.kScalingFactor)
 
-        playerObject.playerGUIItem.SkillIcon.tooltipText = string.format(Locale.ResolveString("SKILLTIER_TOOLTIP"), Locale.ResolveString(playerObject.playerSkillTierName), playerObject.playerSkillTier)
+        playerObject.playerGUIItem.SkillIcon.tooltipText = string.format(ResolveLocalizedString("SKILLTIER_TOOLTIP"), ResolveLocalizedString(playerObject.playerSkillTierName), playerObject.playerSkillTier)
 
         local iconIndex = playerObject.playerSkillTier + 2
         playerObject.playerGUIItem.SkillIcon:SetTexturePixelCoordinates(0, iconIndex * 32, 100, (iconIndex + 1) * 32 - 1)
@@ -1416,7 +1471,7 @@ function GUIScoreboard:UpdateTeam_SkillIcons(playerObject)
         end
         playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\n"
         if playerObject.isSpectator or playerObject.isLastComm or isPreGame then
-            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nCom Tier: " .. Locale.ResolveString(playerObject.comSkillTierName) .. " (" .. tostring(playerObject.comSkillTier) .. ")"
+            playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. "\nCom Tier: " .. ResolveLocalizedString(playerObject.comSkillTierName) .. " (" .. tostring(playerObject.comSkillTier) .. ")"
         end
         if playerObject.isSpectator or playerObject.isLastComm or isPreGame then
             playerObject.playerGUIItem.SkillIcon.tooltipText = playerObject.playerGUIItem.SkillIcon.tooltipText .. string.format("\nCom Skill: %.0f", (playerObject.playerCommSkill))
@@ -1460,8 +1515,6 @@ function GUIScoreboard:UpdateTeam_StatsValues(playerObject, teamObject)
     PROFILE("GUIScoreboard:UpdateTeam_StatsValues")
 
     local resourcesStr = ConditionalValue(teamObject["isVisibleTeam"], tostring(math.floor(playerObject["resources"] * 10) / 10), "-")
-
-    local deadString = Locale.ResolveString("STATUS_DEAD")
 
     local score = tostring(playerObject["score"])
     if (playerObject["isCommander"] or (playerObject["isLastComm"] and not playerObject["isBot"])) and teamObject["isPlayingTeam"] then
@@ -1556,7 +1609,7 @@ function GUIScoreboard:UpdateTeam_BackgroundColor(playerObject, teamObject)
                 for i = 1, #playerObject.playerGUIItem["BadgeItems"] do
                     local badgeItem = playerObject.playerGUIItem["BadgeItems"][i]
                     if GUIItemContainsPoint(badgeItem, mouseX, mouseY) and badgeItem:GetIsVisible() then
-                        local _, badgeNames = Badges_GetBadgeTextures(playerObject["clientIndex"], "scoreboard")
+                        local _, badgeNames = GetPlayerBadgeData(playerObject.playerGUIItem, playerObject["clientIndex"])
                         local badge = ToString(badgeNames[i])
                         self.badgeNameTooltip:SetText(GetBadgeFormalName(badge))
                         hoverBadge = true
@@ -1653,7 +1706,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Mine].icon:SetColor(EALitems[kTechId.Mine].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_RIFLE"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_RIFLE"), true)
             if lifeformCount ~= EALitems[kTechId.Rifle].count then
                 EALitems[kTechId.Rifle].count = lifeformCount
                 EALitems[kTechId.Rifle].text:SetText(tostring(EALitems[kTechId.Rifle].count))
@@ -1661,7 +1714,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Rifle].icon:SetColor(EALitems[kTechId.Rifle].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_SHOTGUN"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_SHOTGUN"), true)
             if lifeformCount ~= EALitems[kTechId.Shotgun].count then
                 EALitems[kTechId.Shotgun].count = lifeformCount
                 EALitems[kTechId.Shotgun].text:SetText(tostring(EALitems[kTechId.Shotgun].count))
@@ -1669,7 +1722,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Shotgun].icon:SetColor(EALitems[kTechId.Shotgun].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_FLAMETHROWER"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_FLAMETHROWER"), true)
             if lifeformCount ~= EALitems[kTechId.Flamethrower].count then
                 EALitems[kTechId.Flamethrower].count = lifeformCount
                 EALitems[kTechId.Flamethrower].text:SetText(tostring(EALitems[kTechId.Flamethrower].count))
@@ -1677,7 +1730,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Flamethrower].icon:SetColor(EALitems[kTechId.Flamethrower].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_HMG"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_HMG"), true)
             if lifeformCount ~= EALitems[kTechId.HeavyMachineGun].count then
                 EALitems[kTechId.HeavyMachineGun].count = lifeformCount
                 EALitems[kTechId.HeavyMachineGun].text:SetText(tostring(EALitems[kTechId.HeavyMachineGun].count))
@@ -1685,7 +1738,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.HeavyMachineGun].icon:SetColor(EALitems[kTechId.HeavyMachineGun].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_GRENADE_LAUNCHER"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_GRENADE_LAUNCHER"), true)
             if lifeformCount ~= EALitems[kTechId.GrenadeLauncher].count then
                 EALitems[kTechId.GrenadeLauncher].count = lifeformCount
                 EALitems[kTechId.GrenadeLauncher].text:SetText(tostring(EALitems[kTechId.GrenadeLauncher].count))
@@ -1721,7 +1774,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Exosuit].icon:SetColor(EALitems[kTechId.Exosuit].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
         elseif teamObject.teamNumber == kTeam2Index then
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_SKULK"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_SKULK"), true)
             if lifeformCount ~= EALitems[kTechId.Skulk].count then
                 EALitems[kTechId.Skulk].count = lifeformCount
                 EALitems[kTechId.Skulk].text:SetText(tostring(EALitems[kTechId.Skulk].count))
@@ -1729,7 +1782,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Skulk].icon:SetColor(EALitems[kTechId.Skulk].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_GORGE"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_GORGE"), true)
             if lifeformCount ~= EALitems[kTechId.Gorge].count then
                 EALitems[kTechId.Gorge].count = lifeformCount
                 EALitems[kTechId.Gorge].text:SetText(tostring(EALitems[kTechId.Gorge].count))
@@ -1737,7 +1790,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Gorge].icon:SetColor(EALitems[kTechId.Gorge].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_LERK"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_LERK"), true)
             if lifeformCount ~= EALitems[kTechId.Lerk].count then
                 EALitems[kTechId.Lerk].count = lifeformCount
                 EALitems[kTechId.Lerk].text:SetText(tostring(EALitems[kTechId.Lerk].count))
@@ -1745,7 +1798,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Lerk].icon:SetColor(EALitems[kTechId.Lerk].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_FADE"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_FADE"), true)
             if lifeformCount ~= EALitems[kTechId.Fade].count then
                 EALitems[kTechId.Fade].count = lifeformCount
                 EALitems[kTechId.Fade].text:SetText(tostring(EALitems[kTechId.Fade].count))
@@ -1753,7 +1806,7 @@ function GUIScoreboard:UpdateTeam_EalIcons(teamObject)
                 EALitems[kTechId.Fade].icon:SetColor(EALitems[kTechId.Fade].count > 0 and kEalActiveColor or kEalInactiveColor)
             end
 
-            lifeformCount = GetCountByStatus(teamObject.teamScores, Locale.ResolveString("STATUS_ONOS"), true)
+            lifeformCount = GetCountByStatus(teamObject.teamScores, ResolveLocalizedString("STATUS_ONOS"), true)
             if lifeformCount ~= EALitems[kTechId.Onos].count then
                 EALitems[kTechId.Onos].count = lifeformCount
                 EALitems[kTechId.Onos].text:SetText(tostring(EALitems[kTechId.Onos].count))
@@ -1844,7 +1897,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     teamObject.teamNameGUIItem = updateTeam["GUIs"]["TeamName"]
     teamObject.teamSkillGUIItem = updateTeam["GUIs"]["TeamSkill"]
     teamObject.teamInfoGUIItem = updateTeam["GUIs"]["TeamInfo"]
-    teamObject.teamNameText = Locale.ResolveString(string.format("NAME_TEAM_%s", updateTeam["TeamNumber"]))
+    teamObject.teamNameText = ResolveLocalizedString(string.format("NAME_TEAM_%s", updateTeam["TeamNumber"]))
     teamObject.teamColor = updateTeam["Color"]
     teamObject.localPlayerHighlightColor = updateTeam["HighlightColor"]
     teamObject.playerList = updateTeam["PlayerList"]
@@ -1867,7 +1920,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     end
 
     -- Update the team name text.
-    local playersOnTeamText = string.format("%d %s", teamObject.numPlayers, teamObject.numPlayers == 1 and Locale.ResolveString("SB_PLAYER") or Locale.ResolveString("SB_PLAYERS"))
+    local playersOnTeamText = string.format("%d %s", teamObject.numPlayers, teamObject.numPlayers == 1 and ResolveLocalizedString("SB_PLAYER") or ResolveLocalizedString("SB_PLAYERS"))
     local teamHeaderText
 
     if not teamObject.isPlayingTeam then
@@ -1876,9 +1929,9 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         if numPlayersConnecting > 0 then
             -- It will show RR team if players are connecting even if no players are in the RR
             if teamObject.numPlayers > 0 then
-                teamHeaderText = string.format("%s (%s, %d %s)", teamObject.teamNameText, playersOnTeamText, numPlayersConnecting, Locale.ResolveString("SB_CONNECTING"))
+                teamHeaderText = string.format("%s (%s, %d %s)", teamObject.teamNameText, playersOnTeamText, numPlayersConnecting, ResolveLocalizedString("SB_CONNECTING"))
             else
-                teamHeaderText = string.format("%s (%d %s)", teamObject.teamNameText, numPlayersConnecting, Locale.ResolveString("SB_CONNECTING"))
+                teamHeaderText = string.format("%s (%d %s)", teamObject.teamNameText, numPlayersConnecting, ResolveLocalizedString("SB_CONNECTING"))
             end
         end
     end
@@ -1891,7 +1944,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 
     -- Update team resource display
     if teamObject.isPlayingTeam then
-        local teamResourcesString = ConditionalValue(teamObject.isVisibleTeam, string.format(Locale.ResolveString("SB_TEAM_RES"), ScoreboardUI_GetTeamResources(teamObject.teamNumber)), "")
+        local teamResourcesString = ConditionalValue(teamObject.isVisibleTeam, string.format(ResolveLocalizedString("SB_TEAM_RES"), ScoreboardUI_GetTeamResources(teamObject.teamNumber)), "")
         teamObject.teamInfoGUIItem["teamRes"]:SetText(string.format("%s", teamResourcesString))
     end
 
@@ -1901,7 +1954,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         teamObject.teamInfoGUIItem["teamCommIcon"]:SetColor(RGBAtoColor(255, 255, 255, 1))
     elseif teamObject.isPlayingTeam then
         -- teamObject.teamInfoGUIItem["teamComm"]:SetIsVisible(true)
-        teamObject.teamInfoGUIItem["teamComm"]:SetText(Locale.ResolveString("NO_COMMANDER"))
+        teamObject.teamInfoGUIItem["teamComm"]:SetText(ResolveLocalizedString("NO_COMMANDER"))
         teamObject.teamInfoGUIItem["teamCommIcon"]:SetColor(RGBAtoColor(255, 50, 50, 1))
     end
 
@@ -1944,7 +1997,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         playerObject.deaths = playerRecord["Deaths"] or 0
         playerObject.isCommander = playerRecord["IsCommander"] -- and teamObject.isVisibleTeam == true
         playerObject.isSpectator, playerObject.isMarine, playerObject.isAlien = playerObject["teamNumber"] == kNeutralTeamType, playerObject["teamNumber"] == kMarineTeamType, playerObject["teamNumber"] == kAlienTeamType
-        playerObject.isDead = playerObject.playerStatus == Locale.ResolveString("STATUS_DEAD")
+        playerObject.isDead = playerObject.playerStatus == ResolveLocalizedString("STATUS_DEAD")
         playerObject.resources = playerRecord["Resources"] or 0
         playerObject.ping = playerRecord["Ping"] or 0
 
@@ -2765,8 +2818,7 @@ function GUIScoreboard:CreateEALGraphicHeader(team, color, logoTexture, logoCoor
 
         EALitems[kTechId.Jetpack] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 12, 340, 114 * 13}, Vector(72, 24, 0), 6.75, true, Locale.ResolveString(LookupTechData(kTechId.Jetpack, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Exosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 16, 340, 114 * 17}, Vector(72, 24, 0), 7.5, true,
-            Locale.ResolveString(LookupTechData(kTechId.Exosuit, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Exosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 16, 340, 114 * 17}, Vector(72, 24, 0), 7.5, true, Locale.ResolveString(LookupTechData(kTechId.Exosuit, kTechDataDisplayName, "unknown")))
     elseif team == kTeam2Index then
         EALitems[kTechId.Skulk] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 0, 340, 114 * 1}, Vector(72, 24, 0), 0, true, Locale.ResolveString(LookupTechData(kTechId.Skulk, kTechDataDisplayName, "unknown")))
 
