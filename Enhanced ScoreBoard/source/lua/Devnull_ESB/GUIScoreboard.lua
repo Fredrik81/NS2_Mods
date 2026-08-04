@@ -342,50 +342,6 @@ local function ResolveLocalizedString(key)
     return resolvedValue
 end
 
-local function populateResolveStrings()
-    PROFILE("GUIScoreboard:populateResolveStrings")
-
-    kResolvedStrings = {}
-    kResolvedStrings["STATUS_COMMANDER"] = Locale.ResolveString("STATUS_COMMANDER")
-    kResolvedStrings["STATUS_DEAD"] = Locale.ResolveString("STATUS_DEAD")
-    kResolvedStrings["STATUS_ALIVE"] = Locale.ResolveString("STATUS_ALIVE")
-    kResolvedStrings["STATUS_SPECTATOR"] = Locale.ResolveString("STATUS_SPECTATOR")
-    kResolvedStrings["STATUS_READY"] = Locale.ResolveString("STATUS_READY")
-    kResolvedStrings["STATUS_NOTREADY"] = Locale.ResolveString("STATUS_NOTREADY")
-    kResolvedStrings["SB_CLICK_FOR_MOUSE"] = Locale.ResolveString("SB_CLICK_FOR_MOUSE")
-    kResolvedStrings["NO_COMMANDER"] = Locale.ResolveString("NO_COMMANDER")
-    kResolvedStrings["SB_SCORE"] = Locale.ResolveString("SB_SCORE")
-    kResolvedStrings["SB_KILLS"] = Locale.ResolveString("SB_KILLS")
-    kResolvedStrings["SB_ASSISTS"] = Locale.ResolveString("SB_ASSISTS")
-    kResolvedStrings["SB_DEATHS"] = Locale.ResolveString("SB_DEATHS")
-    kResolvedStrings["SB_PING"] = Locale.ResolveString("SB_PING")
-    kResolvedStrings["PLAYER"] = Locale.ResolveString("PLAYER")
-    kResolvedStrings["PLAYERS"] = Locale.ResolveString("PLAYERS")
-    kResolvedStrings["STATUS_JETPACK"] = Locale.ResolveString("STATUS_JETPACK")
-    kResolvedStrings["HELP_SCREEN_EXO_MINIGUN"] = Locale.ResolveString("HELP_SCREEN_EXO_MINIGUN")
-    kResolvedStrings["HELP_SCREEN_EXO_RAILGUN"] = Locale.ResolveString("HELP_SCREEN_EXO_RAILGUN")
-    kResolvedStrings["STATUS_RIFLE"] = Locale.ResolveString("STATUS_RIFLE")
-    kResolvedStrings["STATUS_SHOTGUN"] = Locale.ResolveString("STATUS_SHOTGUN")
-    kResolvedStrings["STATUS_FLAMETHROWER"] = Locale.ResolveString("STATUS_FLAMETHROWER")
-    kResolvedStrings["STATUS_HMG"] = Locale.ResolveString("STATUS_HMG")
-    kResolvedStrings["STATUS_GRENADE_LAUNCHER"] = Locale.ResolveString("STATUS_GRENADE_LAUNCHER")
-    kResolvedStrings["STATUS_SKULK"] = Locale.ResolveString("STATUS_SKULK")
-    kResolvedStrings["STATUS_GORGE"] = Locale.ResolveString("STATUS_GORGE")
-    kResolvedStrings["STATUS_LERK"] = Locale.ResolveString("STATUS_LERK")
-    kResolvedStrings["STATUS_FADE"] = Locale.ResolveString("STATUS_FADE")
-    kResolvedStrings["STATUS_ONOS"] = Locale.ResolveString("STATUS_ONOS")
-    kResolvedStrings["SB_PLAYER"] = Locale.ResolveString("SB_PLAYER")
-    kResolvedStrings["SB_PLAYERS"] = Locale.ResolveString("SB_PLAYERS")
-    kResolvedStrings["SB_CONNECTING"] = Locale.ResolveString("SB_CONNECTING")
-    kResolvedStrings["SB_TEAM_RES"] = Locale.ResolveString("SB_TEAM_RES")
-    kResolvedStrings["SKILLTIER_TOOLTIP"] = Locale.ResolveString("SKILLTIER_TOOLTIP")
-    kResolvedStrings["SB_MENU_STEAM_PROFILE"] = Locale.ResolveString("SB_MENU_STEAM_PROFILE")
-    kResolvedStrings["SB_MENU_UNMUTE_VOICE"] = Locale.ResolveString("SB_MENU_UNMUTE_VOICE")
-    kResolvedStrings["SB_MENU_MUTE_VOICE"] = Locale.ResolveString("SB_MENU_MUTE_VOICE")
-    kResolvedStrings["SB_MENU_UNMUTE_TEXT"] = Locale.ResolveString("SB_MENU_UNMUTE_TEXT")
-    kResolvedStrings["SB_MENU_MUTE_TEXT"] = Locale.ResolveString("SB_MENU_MUTE_TEXT")
-end
-
 function GUIScoreboard:OnResolutionChanged(_, _, newX, _)
     PROFILE("GUIScoreboard:OnResolutionChanged")
     GUIScoreboard.screenWidth = newX
@@ -622,7 +578,6 @@ local kBlockedColor = Color(1, 1, 1, 0.9)
 function GUIScoreboard:Initialize()
     PROFILE("GUIScoreboard:Initialize")
 
-    populateResolveStrings()
     self.updateInterval = 0.3
 
     kGUIdata.contentXSize = 0
