@@ -141,6 +141,7 @@ local lastScoreboardVisState = false
 
 local kSteamProfileURL = "http://steamcommunity.com/profiles/"
 local kNS2PanelProfileURL = "https://ns2panel.com/player/%s"
+local kFetchTable = {}
 local kMinTruncatedNameLength = 8
 local lowResScreen = false
 local kGUIdata = {}
@@ -178,42 +179,6 @@ local function dump(o)
     else
         return tostring(o)
     end
-end
-
-local function InspectUserdata(ud)
-    if type(ud) ~= "userdata" then
-        print(string.format("Objektet is not userdata! Is type '%s'", type(ud)))
-        return
-    end
-
-    -- debug.getmetatable är säkrare än getmetatable om metatabellen är skyddad
-    local mt = debug.getmetatable(ud) or getmetatable(ud)
-
-    if not mt then
-        print("This object have no meta tabel.")
-        return
-    end
-
-    print("================ USERDATA INSPECTION ================")
-
-    -- 1. Skriv ut direkt innehåll i metatabellen (t.ex. __eq, __tostring, __gc)
-    print("\n--- Meta tabel keys (Metamethods) ---")
-    for k, v in pairs(mt) do
-        print(string.format("  %-25s [%s]", tostring(k), type(v)))
-    end
-
-    -- 2. Om __index är en tabell (vanligast i C++ / Luabind-bindings)
-    if type(mt.__index) == "table" then
-        print("\n--- Methods and veriables in __index ---")
-        for k, v in pairs(mt.__index) do
-            print(string.format("  %-25s [%s]", tostring(k), type(v)))
-        end
-    elseif type(mt.__index) == "function" then
-        print("\n--- __index is a C-function ---")
-        print("  Methods is dynamic and cannot be listed with pairs().")
-    end
-
-    print("====================================================")
 end
 
 -- Round function implementation with round up and decimal
@@ -451,7 +416,7 @@ local function CreateTeamBackground(self, teamNumber)
     teamInfoItems["teamComm"]:SetTextAlignmentX(GUIItem.Align_Max)
     teamInfoItems["teamComm"]:SetTextAlignmentY(GUIItem.Align_Min)
     teamInfoItems["teamComm"]:SetPosition(Vector(-12 - kPlayerBadgeIconSize - 4, playerDataRowY, 0) * GUIScoreboard.kScalingFactor)
-    teamInfoItems["teamComm"]:SetText(Locale.ResolveString("NO_COMMANDER"))
+    teamInfoItems["teamComm"]:SetText(ResolveLocalizedString("NO_COMMANDER"))
     teamInfoItems["teamComm"]:SetColor(color)
     teamInfoItems["teamComm"]:SetStencilFunc(GUIItem.NotEqual)
     teamInfoItems["teamComm"]:SetIsVisible(isPlayingTeam)
@@ -481,7 +446,7 @@ local function CreateTeamBackground(self, teamNumber)
     scoreItem:SetTextAlignmentY(GUIItem.Align_Min)
     scoreItem:SetPosition(Vector(currentColumnX + 42.5, GUIScoreboard.kTeamNameFontSize + 7, 0) * GUIScoreboard.kScalingFactor)
     scoreItem:SetColor(color)
-    scoreItem:SetText(Locale.ResolveString("SB_SCORE"))
+    scoreItem:SetText(ResolveLocalizedString("SB_SCORE"))
     scoreItem:SetStencilFunc(GUIItem.NotEqual)
     scoreItem:SetIsVisible(isPlayingTeam)
     teamItem:AddChild(scoreItem)
@@ -497,7 +462,7 @@ local function CreateTeamBackground(self, teamNumber)
     killsItem:SetTextAlignmentY(GUIItem.Align_Min)
     killsItem:SetPosition(Vector(currentColumnX, GUIScoreboard.kTeamNameFontSize + 7, 0) * GUIScoreboard.kScalingFactor)
     killsItem:SetColor(color)
-    killsItem:SetText(Locale.ResolveString("SB_KILLS"))
+    killsItem:SetText(ResolveLocalizedString("SB_KILLS"))
     killsItem:SetStencilFunc(GUIItem.NotEqual)
     killsItem:SetIsVisible(isPlayingTeam)
     teamItem:AddChild(killsItem)
@@ -513,7 +478,7 @@ local function CreateTeamBackground(self, teamNumber)
     assistsItem:SetTextAlignmentY(GUIItem.Align_Min)
     assistsItem:SetPosition(Vector(currentColumnX, GUIScoreboard.kTeamNameFontSize + 7, 0) * GUIScoreboard.kScalingFactor)
     assistsItem:SetColor(color)
-    assistsItem:SetText(Locale.ResolveString("SB_ASSISTS"))
+    assistsItem:SetText(ResolveLocalizedString("SB_ASSISTS"))
     assistsItem:SetStencilFunc(GUIItem.NotEqual)
     assistsItem:SetIsVisible(isPlayingTeam)
     teamItem:AddChild(assistsItem)
@@ -529,7 +494,7 @@ local function CreateTeamBackground(self, teamNumber)
     deathsItem:SetTextAlignmentY(GUIItem.Align_Min)
     deathsItem:SetPosition(Vector(currentColumnX, GUIScoreboard.kTeamNameFontSize + 7, 0) * GUIScoreboard.kScalingFactor)
     deathsItem:SetColor(color)
-    deathsItem:SetText(Locale.ResolveString("SB_DEATHS"))
+    deathsItem:SetText(ResolveLocalizedString("SB_DEATHS"))
     deathsItem:SetStencilFunc(GUIItem.NotEqual)
     deathsItem:SetIsVisible(isPlayingTeam)
     teamItem:AddChild(deathsItem)
@@ -557,7 +522,7 @@ local function CreateTeamBackground(self, teamNumber)
     pingItem:SetTextAlignmentY(GUIItem.Align_Min)
     pingItem:SetPosition(Vector(currentColumnX, GUIScoreboard.kTeamNameFontSize + 7, 0) * GUIScoreboard.kScalingFactor)
     pingItem:SetColor(color)
-    pingItem:SetText(Locale.ResolveString("SB_PING"))
+    pingItem:SetText(ResolveLocalizedString("SB_PING"))
     pingItem:SetStencilFunc(GUIItem.NotEqual)
     teamItem:AddChild(pingItem)
 
@@ -867,7 +832,7 @@ function GUIScoreboard:Update_topBarMode()
             topBar:SetIsVisible(not vis)
         end
     else
-        topBar = ClientUI.GetScript("Hud2/topBar/GUIHudTopBarForLocalTeam") -- ToDo: create object for this script at initialization, then get it here
+        topBar = ClientUI.GetScript("Hud2/topBar/GUIHudTopBarForLocalTeam")
 
         if topBar then
             topBar:SetIsHiddenOverride(vis)
@@ -876,40 +841,26 @@ function GUIScoreboard:Update_topBarMode()
 end
 
 -- Current commander/last-commander info
-function GUIScoreboard:Update_TeamsInfo() -- ToDo: Why does this function get all scores etc?
+function GUIScoreboard:Update_TeamsInfo()
     PROFILE("GUIScoreboard:Update_TeamsInfo")
 
     local vis = self.visible and not self.hiddenOverride
     local teamGUISize = {}
-    local fetchTable = {}
+    kFetchTable = {}
 
     for index, team in ipairs(self.teams) do -- ToDo: Move this into seperate function
         -- Update coms info
         local scores = team["GetScores"]()
-
-        for _, player in pairs(scores) do
-            local steamId = GetSteamIdForClientIndex((player and player.ClientIndex) and player.ClientIndex or nil)
-            if steamId and steamId > 0 then
-                table.insert(fetchTable, steamId)
-                if not isPreGame then
-                    -- Handle last com scenarios
-                    local playingTeam = team.TeamNumber ~= kTeamReadyRoom
-                    if playingTeam and player.IsCommander then
-                        if lastComm[team.TeamNumber] ~= steamId then
-                            lastComm[team.TeamNumber] = steamId
-                        end
-                    end
-                end
-            end
-        end
-
         local numPlayers = table.icount(scores) or 0
+
         team["GUIs"]["Background"]:SetIsVisible(vis and (numPlayers > 0))
 
         -- Update connecting players info
-        local numConnectingPlayers = PlayerUI_GetNumConnectingPlayers() or 0
-        if team.TeamNumber == 0 and numConnectingPlayers > 0 then
-            numPlayers = numPlayers + numConnectingPlayers
+        if team.TeamNumber == 0 then
+            local numConnectingPlayers = PlayerUI_GetNumConnectingPlayers() or 0
+            if numConnectingPlayers > 0 then
+                numPlayers = numPlayers + numConnectingPlayers
+            end
         end
 
         if vis then -- The heavy parts, updates each player line
@@ -925,12 +876,10 @@ function GUIScoreboard:Update_TeamsInfo() -- ToDo: Why does this function get al
         -- Update self
         if team.TeamNumber == kTeamReadyRoom and numPlayers <= 0 then
             localPlayerIsSpectator = false
-        elseif team.TeamNumber ~= kTeamReadyRoom and numPlayers <= 0 then
-            lastComm[team.TeamNumber] = nil
         end
     end
 
-    return fetchTable, teamGUISize
+    return teamGUISize
 end
 
 function GUIScoreboard:Update_GUIElements(deltaTime, contentXSize, contentYSize)
@@ -955,7 +904,7 @@ function GUIScoreboard:Update_GUIElements(deltaTime, contentXSize, contentYSize)
 
     local gInfo = GetGameInfoEntity()
     local serverPopulation = gInfo:GetNumClientsTotal()
-    local serverPopulationText = serverPopulation == 1 and tostring(serverPopulation) .. " " .. string.lower(Locale.ResolveString("PLAYER")) or tostring(serverPopulation) .. " " .. string.lower(Locale.ResolveString("PLAYERS"))
+    local serverPopulationText = serverPopulation == 1 and tostring(serverPopulation) .. " " .. string.lower(ResolveLocalizedString("PLAYER")) or tostring(serverPopulation) .. " " .. string.lower(ResolveLocalizedString("PLAYERS"))
     local gameTimeText = serverName .. " | " .. serverPopulationText .. " | " .. mapName .. string.format(" - %d:%02d", minutes, seconds)
 
     self.gameTime:SetText(gameTimeText)
@@ -1137,12 +1086,12 @@ function GUIScoreboard:Update(deltaTime)
 
     self:Update_SetMainVisibles()
 
-    local fetchTable, teamGUISize = self:Update_TeamsInfo()
+    local teamGUISize = self:Update_TeamsInfo()
     local contentXSize, contentYSize = self:Update_toNewSizes(teamGUISize)
 
     self:Update_topBarMode()
 
-    fetchPlayerStats(fetchTable)
+    fetchPlayerStats(kFetchTable)
 
     if vis then
         self:Update_GUIElements(deltaTime, contentXSize, contentYSize)
@@ -1190,24 +1139,25 @@ end
 function GUIScoreboard:UpdateTeam_CommanderName(playerObject, teamObject)
     PROFILE("GUIScoreboard:UpdateTeam_CommanderName")
 
+    -- ToDo: this can now be run once in team update, no need to run it for each player with lastComm object
+
     -- Update commander text based on lastComm
-    if playerObject.isLastComm or playerObject.isCommander then
-        teamObject.commRage = false -- Check for Commander Rage quit
-        teamObject.teamInfoGUIItem["teamComm"]:SetText(playerObject.playerName)
-    end
+    -- if playerObject.isLastComm or playerObject.isCommander then
+    --     teamObject.teamInfoGUIItem["teamComm"]:SetText(playerObject.playerName)
+    -- end
 
     if teamObject.isVisibleTeam and not playerObject.isDead and playerObject.teamNumber == kTeam1Index then
         if table.icontains(playerObject.currentTech, kTechId.Jetpack) then
             if playerObject.playerStatus ~= "" and playerObject.playerStatus ~= " " then
-                playerObject.playerStatus = string.format("%s/%s", playerObject.playerStatus, Locale.ResolveString("STATUS_JETPACK"))
+                playerObject.playerStatus = string.format("%s/%s", playerObject.playerStatus, ResolveLocalizedString("STATUS_JETPACK"))
             else
-                playerObject.playerStatus = Locale.ResolveString("STATUS_JETPACK")
+                playerObject.playerStatus = ResolveLocalizedString("STATUS_JETPACK")
             end
         end
     end
 
     if (playerObject.isCommander or (playerObject.isLastComm and not playerObject.isBot)) and teamObject.isPlayingTeam then
-        if playerObject.comSkillTier > 0 then
+        if playerObject.comSkillTier then
             playerObject.playerGUIItem.CommIcon:SetTexturePixelCoordinates(0, (playerObject.comSkillTier + 1) * 32, 32, (playerObject.comSkillTier + 2) * 32)
         else
             playerObject.playerGUIItem.CommIcon:SetTexturePixelCoordinates(0, 0, 32, 32)
@@ -1903,16 +1853,6 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         teamObject.teamInfoGUIItem["teamRes"]:SetText(string.format("%s", teamResourcesString))
     end
 
-    -- Commander Icon and text visibility
-    if lastComm[teamObject.teamNumber] and teamObject.isPlayingTeam then
-        -- teamObject.teamInfoGUIItem["teamComm"]:SetIsVisible(true)
-        teamObject.teamInfoGUIItem["teamCommIcon"]:SetColor(RGBAtoColor(255, 255, 255, 1))
-    elseif teamObject.isPlayingTeam then
-        -- teamObject.teamInfoGUIItem["teamComm"]:SetIsVisible(true)
-        teamObject.teamInfoGUIItem["teamComm"]:SetText(ResolveLocalizedString("NO_COMMANDER"))
-        teamObject.teamInfoGUIItem["teamCommIcon"]:SetColor(RGBAtoColor(255, 50, 50, 1))
-    end
-
     -- Make sure there is enough room for all players on this team GUI.
     teamObject.teamGUIItem:SetSize(Vector(self:GetTeamItemWidth(), (GUIScoreboard.kTeamItemHeight) + ((GUIScoreboard.kPlayerItemHeight + GUIScoreboard.kPlayerSpacing) * teamObject.numPlayers), 0) * GUIScoreboard.kScalingFactor)
 
@@ -1929,13 +1869,8 @@ function GUIScoreboard:UpdateTeam(updateTeam)
     local numRookies = 0
     local numBots = 0
 
-    -- Reset lastcomm in case of pregame
-    if isPreGame then
-        lastComm[teamObject.teamNumber] = nil
-    end
-
     local isSpectating = false
-    teamObject.commRage = lastComm[teamObject.teamNumber] ~= nil
+    local lastCommFound = false
     for index, player in ipairs(teamObject.playerList) do
         local playerRecord = teamObject.teamScores[index]
         local playerObject = {}
@@ -1989,10 +1924,24 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         playerObject.comSkillTier, playerObject.comSkillTierName, playerObject.comSkillCapped = GetPlayerSkillTier(playerObject.playerCommSkill, playerObject.isRookie, playerObject.CommAdagradSum, playerObject.isBot)
 
         -- Update comm variables
-        if playerObject.isCommander and lastComm[teamObject.teamNumber] ~= playerObject.steamId then
-            lastComm[teamObject.teamNumber] = playerObject.steamId
+        if teamObject.isPlayingTeam then
+            if playerObject.isCommander then
+                lastCommFound = true
+                lastComm[teamObject.teamNumber] = {
+                    Name = playerObject.playerName,
+                    SteamId = playerObject.steamId
+                }
+            end
+            playerObject.isLastComm = (lastComm[teamObject.teamNumber] and lastComm[teamObject.teamNumber].SteamId == playerObject.steamId)
+            if not isPreGame and playerObject.isLastComm then
+                lastCommFound = true
+            end
         end
-        playerObject.isLastComm = lastComm[teamObject.teamNumber] == playerObject.steamId
+
+        -- Add to fetch table
+        if playerObject.steamId and not playerObject.isBot then
+            table.insert(kFetchTable, playerObject.steamId)
+        end
 
         -- Process the player GUI items
         self:UpdateTeam_CommanderName(playerObject, teamObject)
@@ -2022,14 +1971,21 @@ function GUIScoreboard:UpdateTeam(updateTeam)
         currentY = currentY + (GUIScoreboard.kPlayerItemHeight + GUIScoreboard.kPlayerSpacing) * GUIScoreboard.kScalingFactor
     end
 
+    -- Commander Icon and text visibility
+    if not lastCommFound then
+        lastComm[teamObject.teamNumber] = nil
+    end
+    if teamObject.isPlayingTeam and lastComm[teamObject.teamNumber] then
+        teamObject.teamInfoGUIItem["teamComm"]:SetText(lastComm[teamObject.teamNumber].Name)
+        teamObject.teamInfoGUIItem["teamCommIcon"]:SetColor(RGBAtoColor(255, 255, 255, 1))
+    elseif teamObject.isPlayingTeam then
+        teamObject.teamInfoGUIItem["teamComm"]:SetText(ResolveLocalizedString("NO_COMMANDER"))
+        teamObject.teamInfoGUIItem["teamCommIcon"]:SetColor(RGBAtoColor(255, 50, 50, 1))
+    end
+
     -- Is spectating handle
     if not teamObject.isPlayingTeam then
         localPlayerIsSpectator = isSpectating
-    end
-
-    -- Commander Range handle
-    if teamObject.commRage then
-        lastComm[teamObject.teamNumber] = nil
     end
 
     -- Team skill avg icon
@@ -2041,7 +1997,7 @@ function GUIScoreboard:UpdateTeam(updateTeam)
 
             local halfPlayerNum = 0.5 * teamObject.numPlayers
             local skillTier, tierName = GetPlayerSkillTier(avgSkill, numRookies > halfPlayerNum, nil, numBots > halfPlayerNum)
-            teamObject.teamSkillGUIItem.tooltipText = string.format(Locale.ResolveString("SKILLTIER_TOOLTIP"), Locale.ResolveString(tierName), skillTier)
+            teamObject.teamSkillGUIItem.tooltipText = string.format(ResolveLocalizedString("SKILLTIER_TOOLTIP"), ResolveLocalizedString(tierName), skillTier)
             local textureIndex = skillTier + 2
             teamObject.teamSkillGUIItem:SetTexturePixelCoordinates(0, textureIndex * 32, 100, (textureIndex + 1) * 32 - 1)
             teamObject.teamSkillGUIItem:SetIsVisible(true)
@@ -2581,13 +2537,13 @@ function GUIScoreboard:SendKeyEvent(key, down)
 
                         self.hoverMenu:SetBackgroundColor(bgColor)
                         self.hoverMenu:AddButton(playerName, nameBgColor, nameBgColor, textColor)
-                        self.hoverMenu:AddButton(Locale.ResolveString("SB_MENU_STEAM_PROFILE"), teamColorHalf, teamColorHighlight, textColor, openSteamProf)
+                        self.hoverMenu:AddButton(ResolveLocalizedString("SB_MENU_STEAM_PROFILE"), teamColorHalf, teamColorHighlight, textColor, openSteamProf)
                         self.hoverMenu:AddButton("NS2Panel profile", teamColorHalf, teamColorHighlight, textColor, openNS2PanelProf)
 
                         if Client.GetSteamId() ~= steamId then
                             self.hoverMenu:AddSeparator("muteOptions")
-                            self.hoverMenu:AddButton(ConditionalValue(isVoiceMuted, Locale.ResolveString("SB_MENU_UNMUTE_VOICE"), Locale.ResolveString("SB_MENU_MUTE_VOICE")), teamColorHalf, teamColorHighlight, textColor, muteVoice)
-                            self.hoverMenu:AddButton(ConditionalValue(isTextMuted, Locale.ResolveString("SB_MENU_UNMUTE_TEXT"), Locale.ResolveString("SB_MENU_MUTE_TEXT")), teamColorHalf, teamColorHighlight, textColor, muteText)
+                            self.hoverMenu:AddButton(ConditionalValue(isVoiceMuted, ResolveLocalizedString("SB_MENU_UNMUTE_VOICE"), ResolveLocalizedString("SB_MENU_MUTE_VOICE")), teamColorHalf, teamColorHighlight, textColor, muteVoice)
+                            self.hoverMenu:AddButton(ConditionalValue(isTextMuted, ResolveLocalizedString("SB_MENU_UNMUTE_TEXT"), ResolveLocalizedString("SB_MENU_MUTE_TEXT")), teamColorHalf, teamColorHighlight, textColor, muteText)
                         end
 
                         self.hoverMenu:Show()
@@ -2752,62 +2708,64 @@ function GUIScoreboard:CreateEALGraphicHeader(team, color, logoTexture, logoCoor
     xOffset = xOffset + logoSizeX + GUILinearScale(10)
     lowResScreen = (GUIScoreboard.screenWidth < 1800) and true or false
     if team == kTeam1Index then
-        EALitems[kTechId.Welder] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), 0, true, Locale.ResolveString(LookupTechData(kTechId.Welder, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Welder] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), 0, true, ResolveLocalizedString(LookupTechData(kTechId.Welder, kTechDataDisplayName, "unknown")))
 
         EALitems[kTechId.ClusterGrenade] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 15, 340, 114 * 16}, Vector(72, 24, 0), 0.5, true,
-            Locale.ResolveString(LookupTechData(kTechId.ClusterGrenade, kTechDataDisplayName, "unknown")))
+            ResolveLocalizedString(LookupTechData(kTechId.ClusterGrenade, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Mine] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 11, 340, 114 * 12}, Vector(72, 24, 0), 1, true, Locale.ResolveString(LookupTechData(kTechId.Mine, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Mine] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 11, 340, 114 * 12}, Vector(72, 24, 0), 1, true, ResolveLocalizedString(LookupTechData(kTechId.Mine, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Rifle] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 1, 340, 114 * 2}, Vector(72, 24, 0), 2, true, Locale.ResolveString(LookupTechData(kTechId.Rifle, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Rifle] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 1, 340, 114 * 2}, Vector(72, 24, 0), 2, true, ResolveLocalizedString(LookupTechData(kTechId.Rifle, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Shotgun] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 2, 340, 114 * 3}, Vector(72, 24, 0), 3, true, Locale.ResolveString(LookupTechData(kTechId.Shotgun, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Shotgun] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 2, 340, 114 * 3}, Vector(72, 24, 0), 3, true, ResolveLocalizedString(LookupTechData(kTechId.Shotgun, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Flamethrower] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 4, 340, 114 * 5}, Vector(72, 24, 0), 4, true, Locale.ResolveString(LookupTechData(kTechId.Flamethrower, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Flamethrower] =
+            CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 4, 340, 114 * 5}, Vector(72, 24, 0), 4, true, ResolveLocalizedString(LookupTechData(kTechId.Flamethrower, kTechDataDisplayName, "unknown")))
 
         EALitems[kTechId.HeavyMachineGun] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 5, 340, 114 * 6}, Vector(72, 24, 0), 5, true,
-            Locale.ResolveString(LookupTechData(kTechId.HeavyMachineGun, kTechDataDisplayName, "unknown")))
+            ResolveLocalizedString(LookupTechData(kTechId.HeavyMachineGun, kTechDataDisplayName, "unknown")))
 
         EALitems[kTechId.GrenadeLauncher] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 3, 340, 114 * 4}, Vector(72, 24, 0), 6, true,
-            Locale.ResolveString(LookupTechData(kTechId.GrenadeLauncher, kTechDataDisplayName, "unknown")))
+            ResolveLocalizedString(LookupTechData(kTechId.GrenadeLauncher, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Jetpack] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 12, 340, 114 * 13}, Vector(72, 24, 0), 6.75, true, Locale.ResolveString(LookupTechData(kTechId.Jetpack, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Jetpack] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 12, 340, 114 * 13}, Vector(72, 24, 0), 6.75, true, ResolveLocalizedString(LookupTechData(kTechId.Jetpack, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Exosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 16, 340, 114 * 17}, Vector(72, 24, 0), 7.5, true, Locale.ResolveString(LookupTechData(kTechId.Exosuit, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Exosuit] = CreateEALIcon(item.background, kEalMarineTexture, {0, 114 * 16, 340, 114 * 17}, Vector(72, 24, 0), 7.5, true, ResolveLocalizedString(LookupTechData(kTechId.Exosuit, kTechDataDisplayName, "unknown")))
     elseif team == kTeam2Index then
-        EALitems[kTechId.Skulk] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 0, 340, 114 * 1}, Vector(72, 24, 0), 0, true, Locale.ResolveString(LookupTechData(kTechId.Skulk, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Skulk] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 0, 340, 114 * 1}, Vector(72, 24, 0), 0, true, ResolveLocalizedString(LookupTechData(kTechId.Skulk, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Gorge] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 1, 340, 114 * 2}, Vector(72, 24, 0), 1, true, Locale.ResolveString(LookupTechData(kTechId.Gorge, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Gorge] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 1, 340, 114 * 2}, Vector(72, 24, 0), 1, true, ResolveLocalizedString(LookupTechData(kTechId.Gorge, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Lerk] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 2, 340, 114 * 3}, Vector(72, 24, 0), 2, true, Locale.ResolveString(LookupTechData(kTechId.Lerk, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Lerk] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 2, 340, 114 * 3}, Vector(72, 24, 0), 2, true, ResolveLocalizedString(LookupTechData(kTechId.Lerk, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Fade] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 3, 340, 114 * 4}, Vector(72, 24, 0), 3, true, Locale.ResolveString(LookupTechData(kTechId.Fade, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Fade] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 3, 340, 114 * 4}, Vector(72, 24, 0), 3, true, ResolveLocalizedString(LookupTechData(kTechId.Fade, kTechDataDisplayName, "unknown")))
 
-        EALitems[kTechId.Onos] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 4, 340, 114 * 5}, Vector(72, 24, 0), 4, true, Locale.ResolveString(LookupTechData(kTechId.Onos, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Onos] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 4, 340, 114 * 5}, Vector(72, 24, 0), 4, true, ResolveLocalizedString(LookupTechData(kTechId.Onos, kTechDataDisplayName, "unknown")))
 
         -- if prowler
         if kProwlerCost then
-            EALitems[kTechId.Prowler] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 5, 340, 114 * 6}, Vector(72, 24, 0), 5, true, Locale.ResolveString(LookupTechData(kTechId.Prowler, kTechDataDisplayName, "unknown")))
+            EALitems[kTechId.Prowler] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 5, 340, 114 * 6}, Vector(72, 24, 0), 5, true, ResolveLocalizedString(LookupTechData(kTechId.Prowler, kTechDataDisplayName, "unknown")))
         end
 
         -- PVE
         local iconPos = 6.5 -- add spacer
-        EALitems[kTechId.Shell] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(72, 24, 0), iconPos, false, Locale.ResolveString(LookupTechData(kTechId.Shell, kTechDataDisplayName, "unknown")))
-        EALitems[kTechId.TwoShells] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(72, 24, 0), iconPos + 0.2, true, Locale.ResolveString(LookupTechData(kTechId.Shell, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Shell] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(72, 24, 0), iconPos, false, ResolveLocalizedString(LookupTechData(kTechId.Shell, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.TwoShells] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(72, 24, 0), iconPos + 0.2, true,
+            ResolveLocalizedString(LookupTechData(kTechId.Shell, kTechDataDisplayName, "unknown")))
         EALitems[kTechId.ThreeShells] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 6, 340, 114 * 7}, Vector(72, 24, 0), iconPos + 0.4, false,
-            Locale.ResolveString(LookupTechData(kTechId.Shell, kTechDataDisplayName, "unknown")))
+            ResolveLocalizedString(LookupTechData(kTechId.Shell, kTechDataDisplayName, "unknown")))
 
         iconPos = iconPos + 1
-        EALitems[kTechId.Veil] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(72, 24, 0), iconPos, false, Locale.ResolveString(LookupTechData(kTechId.Veil, kTechDataDisplayName, "unknown")))
-        EALitems[kTechId.TwoVeils] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(72, 24, 0), iconPos + 0.2, true, Locale.ResolveString(LookupTechData(kTechId.Veil, kTechDataDisplayName, "unknown")))
-        EALitems[kTechId.ThreeVeils] =
-            CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(72, 24, 0), iconPos + 0.4, false, Locale.ResolveString(LookupTechData(kTechId.Veil, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Veil] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(72, 24, 0), iconPos, false, ResolveLocalizedString(LookupTechData(kTechId.Veil, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.TwoVeils] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(72, 24, 0), iconPos + 0.2, true, ResolveLocalizedString(LookupTechData(kTechId.Veil, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.ThreeVeils] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 8, 340, 114 * 9}, Vector(72, 24, 0), iconPos + 0.4, false,
+            ResolveLocalizedString(LookupTechData(kTechId.Veil, kTechDataDisplayName, "unknown")))
 
         iconPos = iconPos + 1
-        EALitems[kTechId.Spur] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), iconPos, false, Locale.ResolveString(LookupTechData(kTechId.Spur, kTechDataDisplayName, "unknown")))
-        EALitems[kTechId.TwoSpurs] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), iconPos + 0.2, true, Locale.ResolveString(LookupTechData(kTechId.Spur, kTechDataDisplayName, "unknown")))
-        EALitems[kTechId.ThreeSpurs] =
-            CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), iconPos + 0.4, false, Locale.ResolveString(LookupTechData(kTechId.Spur, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.Spur] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), iconPos, false, ResolveLocalizedString(LookupTechData(kTechId.Spur, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.TwoSpurs] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), iconPos + 0.2, true, ResolveLocalizedString(LookupTechData(kTechId.Spur, kTechDataDisplayName, "unknown")))
+        EALitems[kTechId.ThreeSpurs] = CreateEALIcon(item.background, kEalAlienTexture, {0, 114 * 7, 340, 114 * 8}, Vector(72, 24, 0), iconPos + 0.4, false,
+            ResolveLocalizedString(LookupTechData(kTechId.Spur, kTechDataDisplayName, "unknown")))
     end
 
     return item

@@ -14,9 +14,7 @@
  * Should probably be renamed PlayerRecords or PlayerDatabase
  *
  * Keeps track of when it was last updated and avoids updating more often than kMaxPlayerDataAge
-]]
-
-Script.Load("lua/Insight.lua")
+]] Script.Load("lua/Insight.lua")
 
 -- primary lookup table with clientIndex (clientId) as key
 local playerData = unique_map()
@@ -88,7 +86,11 @@ function Scoreboard_ReloadPlayerData()
     lastPlayerDataUpdateTime = Shared.GetTime()
 
     local tdEnabled = Shared.GetThunderdomeEnabled()
+    local gameInfo = GetGameInfoEntity()
+    local preGameStarted = (gameInfo and gameInfo:GetState() <= kGameState.PreGame)
 
+    local foundMarineCommander = false
+    local foundAlienCommander = false
     for _, pie in ientitylist(Shared.GetEntitiesWithClassname("PlayerInfoEntity")) do
 
         local statusTxt = "-"
@@ -152,34 +154,39 @@ function Scoreboard_ReloadPlayerData()
         if playerRecord.IsCommander then
             local playerEnt = Shared.GetEntity(playerRecord.EntityId)
             if playerEnt then
-
                 local commanderTeam = playerEnt:GetTeamType()
-                if commanderTeam == kMarineTeamType and not (kLastMarineCommanderInfo and kLastMarineCommanderInfo.SteamId32 == playerRecord.SteamId) then
-                    kLastMarineCommanderInfo = {
-                        CallingCard = playerRecord.CallingCard,
-                        Name = playerRecord.Name,
+                if commanderTeam == kMarineTeamType then
+                    if not (kLastMarineCommanderInfo and kLastMarineCommanderInfo.SteamId32 == playerRecord.SteamId) then
+                        kLastMarineCommanderInfo = {
+                            CallingCard = playerRecord.CallingCard,
+                            Name = playerRecord.Name,
 
-                        -- Skill Badge Info
-                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
-                        Skill = playerRecord.Skill,
-                        AdagradSum = playerRecord.AdagradSum,
-                        Rookie = playerRecord.IsRookie
-                    }
-                elseif commanderTeam == kAlienTeamType and not (kLastAlienCommanderInfo and kLastAlienCommanderInfo.SteamId32 == playerRecord.SteamId) then
-                    kLastAlienCommanderInfo = {
-                        CallingCard = playerRecord.CallingCard,
-                        Name = playerRecord.Name,
+                            -- Skill Badge Info
+                            SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                            Skill = playerRecord.Skill,
+                            AdagradSum = playerRecord.AdagradSum,
+                            Rookie = playerRecord.IsRookie
+                        }
+                    end
+                elseif commanderTeam == kAlienTeamType then
+                    if not (kLastAlienCommanderInfo and kLastAlienCommanderInfo.SteamId32 == playerRecord.SteamId) then
+                        kLastAlienCommanderInfo = {
+                            CallingCard = playerRecord.CallingCard,
+                            Name = playerRecord.Name,
 
-                        -- Skill Badge Info
-                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
-                        Skill = playerRecord.Skill,
-                        AdagradSum = playerRecord.AdagradSum,
-                        Rookie = playerRecord.IsRookie
-                    }
+                            -- Skill Badge Info
+                            SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                            Skill = playerRecord.Skill,
+                            AdagradSum = playerRecord.AdagradSum,
+                            Rookie = playerRecord.IsRookie
+                        }
+                    end
                 end
             end
         end
     end
+
+
 
     sortedPlayerData = {}
     playerDataByName = {}

@@ -1,10 +1,6 @@
 local Shine = Shine
 local Plugin = Plugin
 
---Script.Load("lua/shine/extensions/ESBplus/client_utils.lua")
---Script.Load("lua/shine/extensions/ESBplus/shared_net.lua")
---Script.Load("lua/shine/extensions/ESBplus/client_net.lua")
-
 local hideTextShadowIds = {19849485, 68118554}
 
 local function dump(o)
@@ -76,11 +72,6 @@ function Plugin.RecESB_Data(message)
 end
 Client.HookNetworkMessage(Plugin.kMsgDataName, Plugin.RecESB_Data)
 
---function Plugin.RecESB_LastRound(message)
---	Shared.ConsoleCommand("cl_lastround " .. message.round_id)
---end
---Client.HookNetworkMessage(Plugin.kMsgLastRoundName, Plugin.RecESB_LastRound)
-
 -- Defines
 function Plugin.CalcPlayerSkill(skill, adagradSum)
 	if not skill or skill <= 0 then
@@ -88,9 +79,6 @@ function Plugin.CalcPlayerSkill(skill, adagradSum)
 	end
 
 	if adagradSum then
-		-- capping the skill values using sum of squared adagrad gradients
-		-- This should stop the skill tier from changing too often for some players due to short term trends
-		-- The used factor may need some further adjustments
 		if adagradSum <= 0 then
 			skill = 0
 		else
@@ -204,8 +192,6 @@ function Plugin:InitReplace()
 			end
 		)
 	end
-
-	--Plugin.oldGUIScoreboardSendKeyEvent = Shine.ReplaceClassMethod("GUIScoreboard", "SendKeyEvent", Plugin.GUIScoreboardSendKeyEvent)
 end
 
 Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
@@ -218,12 +204,9 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 
 	local playerList = updateTeam["PlayerList"]
 	local teamNameGUIItem = updateTeam["GUIs"]["TeamName"]
-	--local teamSkillGUIItem = updateTeam["GUIs"]["TeamSkill"]
 	local teamScores = updateTeam["GetScores"]()
-	--local numPlayers = 0--table.icount(teamScores)
 	local currentPlayerIndex = 1
 
-	--local totalSkill = 0
 	local isSpectator, isMarine, isAlien = updateTeam.TeamNumber == 0, updateTeam.TeamNumber == 1, updateTeam.TeamNumber == 2
 
 	-- Update team rows
@@ -233,30 +216,19 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 			return
 		end
 
-		--local playerName = playerRecord.Name
-		--local adagradSum = playerRecord.AdagradSum
 		local baseSkill = playerRecord.Skill
-		--local playerTierSkill = Plugin.CalcPlayerSkill(baseSkill, adagradSum)
 		local clientIndex = playerRecord.ClientIndex
 		local steamId = GetSteamIdForClientIndex(clientIndex)
 
 		local playerData = Plugin.PlayerData[tostring(clientIndex)]
 		local marineSkill, alienSkill = Plugin.GetTeamsAvgSkill(baseSkill, playerData and playerData.skill_offset or 0)
-		--local playerSkill = (isMarine and marineSkill) or (isAlien and alienSkill) or 0
-		--local isCommander = playerData and playerData.IsCommander or false
 
-		--[[if (baseSkill ~= -1) then -- Only count actual players, not bots
-      numPlayers = numPlayers + 1;
-      totalSkill = totalSkill + playerSkill;
-    end--]]
 		-- Insert into the badge hover action
 		if not scoreboard.hoverMenu.background:GetIsVisible() and not MainMenu_GetIsOpened() then
 			if MouseTracker_GetIsVisible() then
 				local mouseX, mouseY = Client.GetCursorPosScreen()
 				local skillIcon = player.SkillIcon
 				if skillIcon:GetIsVisible() and GUIItemContainsPoint(skillIcon, mouseX, mouseY) then
-					--local nextSkill = Plugin.GetPlayerSkillNextSkill(playerTierSkill)
-
 					if skillIcon.tooltipText == "Skill Tier: Bot (-1)" then
 						scoreboard.badgeNameTooltip:SetText("Bot")
 					elseif string.match(skillIcon.tooltipText, "KDR:") then
@@ -298,12 +270,10 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 
 	-- Update team skill header
 	if (Plugin.dt.EnableTeamAvgSkill or (Plugin.dt.EnableTeamAvgSkillPregame and (not GetGameInfoEntity():GetGameStarted()))) and (not Plugin.dt.EnableNsl) then -- Display when enabled in pregame or during if configured as such
-		if updateTeam.TeamNumber >= 1 and updateTeam.TeamNumber <= 2 then --and numPlayers > 0 then -- Display for only aliens or marines
+		if updateTeam.TeamNumber == 1 or updateTeam.TeamNumber == 2 then --and numPlayers > 0 then -- Display for only aliens or marines
 			local avgSkill = (updateTeam.TeamNumber == 1) and Plugin.dt.marine_avg_skill or Plugin.dt.alien_avg_skill
 			local totalSkill = (updateTeam.TeamNumber == 1) and Plugin.dt.marine_total_skill or Plugin.dt.alien_total_skill
 
-			--
-			--local teamAvgSkill = totalSkill / numPlayers
 			local teamHeaderText = teamNameGUIItem:GetText()
 			teamHeaderText = string.sub(teamHeaderText, 1, string.len(teamHeaderText) - 1) -- Original header
 
@@ -314,11 +284,7 @@ Plugin.GUIScoreboardUpdateTeam = function(scoreboard, updateTeam)
 			end
 
 			teamHeaderText = teamHeaderText .. ")"
-			--
-
 			teamNameGUIItem:SetText(teamHeaderText)
-
-		--teamSkillGUIItem:SetPosition(Vector(teamNameGUIItem:GetTextWidth(teamNameGUIItem:GetText()) + 20, 5, 0) * GUIScoreboard.kScalingFactor)
 		end
 	end
 end
@@ -341,18 +307,13 @@ function Plugin.GUIScoreboardSendKeyEvent(self, key, down)
 	end
 
 	if key == InputKey.MouseButton0 then -- and self.mousePressed["LMB"]["Down"] ~= down and down and not MainMenu_GetIsOpened()
-		--local steamId = GetSteamIdForClientIndex(self.hoverPlayerClientIndex)
 		if _backgroundGetIsVisible then
 			return false
 		elseif true then --steamId ~= 0 or self.hoverPlayerClientIndex ~= 0 and Shared.GetDevMode()
-			-- local isVoiceMuted = ChatUI_GetClientMuted(self.hoverPlayerClientIndex)
-
 			local teamColorBg
 			local teamColorHighlight
-			-- local playerName = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "Name")
 			local teamNumber = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "EntityTeamNumber")
 			local isCommander = Scoreboard_GetPlayerData(self.hoverPlayerClientIndex, "IsCommander")
-			-- and GetIsVisibleTeam(teamNumber)
 
 			local textColor = Color(1, 1, 1, 1)
 

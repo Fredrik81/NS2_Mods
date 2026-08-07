@@ -2,8 +2,6 @@ local Plugin = Plugin
 local Shine = Shine
 local AdvancedServerOptions = AdvancedServerOptions
 
---Script.Load("lua/shine/extensions/ESBplus/crypt/salsa20.lua")
-
 Plugin.HasConfig = true
 Plugin.ConfigName = "EnhancedScoreboard.json"
 
@@ -230,10 +228,6 @@ function Plugin.TableBaseCopy(base, migrate)
 	end
 
 	return new
-end
-
-function Plugin.Encrypt(str)
-	return string.ToBase64(Plugin.salsa20.encrypt({112, 41, 138, 59, 2, 227, 189, 32, 17, 136, 229, 28, 98, 193, 240, 112, 243, 164, 70, 170, 2, 89, 118, 140, 158, 108, 73, 201, 83, 73, 143, 245}, {214, 99, 234, 53, 159, 86, 232, 213}, str, 20))
 end
 
 -- Defines
